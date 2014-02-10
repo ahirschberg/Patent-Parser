@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 
 
 #
-# Change tagList[10] when you add new tags!
+# Change tagList[10] when you add new tags, you big dummy!
 #
 tagList = [ 'document-id>document-date', #Date (published?)
             'title-of-invention', #Title of invention
@@ -60,18 +60,23 @@ def split_xml(fulldoc):
     xml = []
     lnum = 0
     n_iter = 0
+    print 'Splitting xml, please wait...'
     for line in fulldoc:
         lnum += 1
         xml.append(line)
         if (line.strip() == '</patent-application-publication>'):
             # Clone the list and append it to xmldocs
             xmldocs.append(list(xml))
-            print 'xml', len(xml)
+            #print 'xml', len(xml)
+            # Write to file (should be commmented out, for debugging purposes
+            #f = open(os.path.dirname(os.path.realpath(__file__)) + '/output.csv', 'a') 
+            #f.write(''.join(xml))
             n_iter += 1
             xml = []
-            if (n_iter > 10):
-                return #If this is uncommented, it will split only once
-    print 'xmldocs', len(xmldocs)
+            #if (n_iter > 10):
+            #    return #If this is uncommented, it will split only once
+
+    print 'Done.  Split xml file into %s individual xml docs' % len(xmldocs)
 
 
 def scrape_multi(xmldocs):
@@ -81,23 +86,24 @@ def scrape_multi(xmldocs):
         global iteration
         iteration += 1
 
+
 def scrape(xmllist):
     xml = '\n'.join(xmllist)
-    print 'Parsing xml with length', len(xml)
+    #print 'Parsing xml with length', len(xml)
     soup = BeautifulSoup(xml, ["lxml", "xml"])
     # List all scraped data will be stored in
     datalist = []
-    print '===========================\n      Starting Scrape (%s lines)      \n===========================' % soup.prettify().count('\n')
-    
+    print 'Scraping %s of %s - (%s lines).' % (iteration + 1, len(xmldocs), soup.prettify().count('\n')),
+
     # Change number here as you add new tags
-    # Does not work VVVVVVVVVV
-    govtInterestClause = parse_xml(soup, tagList[10]).lower()
-    print govtInterestClause
-    govtInterestClause = re.sub("[^a-zA-Z0-9]", "", govtInterestClause); 
-    print govtInterestClause 
-    if (govtInterestClause.find('NSF') == -1 and govtInterestClause.find('National Science Foundation') == -1):
-        print '======== NO NSF IN GOVT INTEREST CLAUSE, RETURNING ======='
-        return
+    # Gets the government interest field and looks for NSF or national science foundation
+    govtInterestClause = re.sub("[^a-zA-Z0-9]", "", parse_xml(soup, tagList[10])); 
+    if (govtInterestClause.find('nsf') == -1 and govtInterestClause.find('nationalsciencefoundation') == -1):
+        print 'No NSF reference, skipping.'
+        #return
+    else:
+        print 'Found NSF reference, adding to CSV. <!!!!!!!!!!!'
+
     for tag in tagList:
         datalist.append(parse_xml(soup, tag))
     write_data(datalist)
@@ -155,11 +161,14 @@ def parse_xml(soup, tag):
             else:                
                 result = tagString(finaltag)
     
-    return result
+    #print type(result), result
+    return unicode(result)
+
 
 # Put in own method to make logic less cluttered
 def tag_name_contains(descend, string):
     return descend != None and str(type(descend)) == '<class \'bs4.element.Tag\'>' and descend.name != None and descend.name.find(string) != -1
+
 
 def write_output(f, output_str):
     # If line doesn't already have line break at end, add one
@@ -179,16 +188,15 @@ def setup_datalist(datalist):
     return datalist
 
 
+def clear_file():
+    f = open(os.path.dirname(os.path.realpath(__file__)) + '/output.csv', 'w') 
+    f.write('')
+    f.close()
+
+
 def write_data(datalist):
     count = 0
-    writemode = 'w'
-    if (iteration > 0):
-        writemode = 'a'
-    f = open(os.path.dirname(os.path.realpath(__file__)) + '/output.csv', writemode) 
-    #print f
-    header = '====Document %s, length %s====' % (count, len(datalist)) 
-    #print header
-    #write_output(f, header)
+    f = open(os.path.dirname(os.path.realpath(__file__)) + '/output.csv', 'a') 
     
     for i in xrange(0, len(datalist)):
         datalist[i] = (datalist[i].replace(' \n \n \n ', ' - '))
@@ -206,5 +214,6 @@ def write_data(datalist):
 
 
 split_xml(fulldoc)
+clear_file()
 scrape_multi(xmldocs=xmldocs)
 
