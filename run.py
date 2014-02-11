@@ -1,6 +1,7 @@
 import urllib
 import os
 import re
+import time
 import zipfile
 from bs4 import BeautifulSoup
 
@@ -24,6 +25,7 @@ tagList = [ 'document-id>document-date', #Date (published?)
             'continuity-data>division-of' #Parent Case - cases in <parent-child>? 
             ]
 
+logParsed = False # Useful for debugging, will write all parsed text to file, which is good if the full file is too big to be opened
 
 def tagString(tag):
     result = ''
@@ -45,13 +47,15 @@ def tagTreeString(tag):
             tree = '<' + parenttag.name + '> ' + tree
     return tree
 
-#response = urllib.urlopen("http://patents.reedtech.com/downloads/ApplicationFullText/2001/pa011227.zip")
-print 'Getting zip file'
-#fulldoczip = response.read()
-with zipfile.ZipFile(open(os.path.dirname(os.path.realpath(__file__)) + '/pa011227.zip'), 'r') as myzip:
+print 'Getting zip file with size' 
+response = urllib.urlretrieve("http://patents.reedtech.com/downloads/ApplicationFullText/2001/pa011227.zip")
+print 'Got response:', response
+with zipfile.ZipFile(response[0], 'r') as myzip:
     fulldoc = myzip.open('pa011227.xml')
+#with zipfile.ZipFile(open(os.path.dirname(os.path.realpath(__file__)) + '/pa011227.zip'), 'r') as myzip:
+#    fulldoc = myzip.open('pa011227.xml')
 #print("Got xml from server")
-#fulldoc = open(os.path.dirname(os.path.realpath(__file__)) + '/2002-10-03applications.xml')
+#fulldoc = open(os.path.dirname(os.path.realpath(__file__)) + '/100xml.xml')
 xmldocs = []
 iteration = 0
 
@@ -67,15 +71,15 @@ def split_xml(fulldoc):
         if (line.strip() == '</patent-application-publication>'):
             # Clone the list and append it to xmldocs
             xmldocs.append(list(xml))
-            #print 'xml', len(xml)
             # Write to file (should be commmented out, for debugging purposes
-            #f = open(os.path.dirname(os.path.realpath(__file__)) + '/output.csv', 'a') 
-            #f.write(''.join(xml))
+            if logParsed:
+                f = open(os.path.dirname(os.path.realpath(__file__)) + '/output.csv', 'a') 
+                f.write(''.join(xml))
             n_iter += 1
             xml = []
-            #if (n_iter > 10):
-            #    return #If this is uncommented, it will split only once
-
+            #If this is uncommented, it will split only a set maximum of times
+            #if (n_iter > 100):
+            #    return 
     print 'Done.  Split xml file into %s individual xml docs' % len(xmldocs)
 
 
@@ -88,25 +92,48 @@ def scrape_multi(xmldocs):
 
 
 def scrape(xmllist):
+    print 'Scraping %s of %s - (%s lines).' % (iteration + 1, len(xmldocs), '?'),
+
+    # Gets the government interest field and looks for NSF or national science foundation
+    if (get_govt_interest(xmllist)):
+        print 'Found NSF reference, adding to CSV. <!!!!!!!!!!!'
+    else:
+        print 'No NSF reference, skipping'
+        return 
+    # Create a string from the singular xml list created in split_xml()
     xml = '\n'.join(xmllist)
-    #print 'Parsing xml with length', len(xml)
     soup = BeautifulSoup(xml, ["lxml", "xml"])
+
     # List all scraped data will be stored in
     datalist = []
-    print 'Scraping %s of %s - (%s lines).' % (iteration + 1, len(xmldocs), soup.prettify().count('\n')),
-
-    # Change number here as you add new tags
-    # Gets the government interest field and looks for NSF or national science foundation
-    govtInterestClause = re.sub("[^a-zA-Z0-9]", "", parse_xml(soup, tagList[10])); 
-    if (govtInterestClause.find('nsf') == -1 and govtInterestClause.find('nationalsciencefoundation') == -1):
-        print 'No NSF reference, skipping.'
-        #return
-    else:
-        print 'Found NSF reference, adding to CSV. <!!!!!!!!!!!'
 
     for tag in tagList:
         datalist.append(parse_xml(soup, tag))
     write_data(datalist)
+
+
+# get Govt Interest without using lxml (prevents a whole xml tree structure from needing to be parsed and created)
+# This makes parsing without finding any NSF clauses (the vast majority) 80.060606061 times faster
+def get_govt_interest(xmllist):
+    startpos = -1
+    endpos = -1
+    for line in xmllist:
+        startpos2 = line.find('<paragraph-federal-research-statement>')
+        endpos2 = line.find('</paragraph-federal-research-statement>')
+        if startpos2 >= 0:
+            startpos = startpos2
+        if endpos2 >= 0:
+            endpos = endpos2
+        
+        if startpos >= 0:
+            standardline = re.sub("[^a-zA-Z0-9]", "", line).lower() 
+            if (standardline.find('nsf') >= 0 or standardline.find('nationalsciencefoundation') >= 0):
+                print line
+                return True
+        if endpos >= 0:
+            return False
+    return False
+
 
 def parse_xml(soup, tag):
     finaltag = None #The tag object which will be printed or returned at the end of the scrape
@@ -212,8 +239,10 @@ def write_data(datalist):
 
     f.close()
 
-
+start = time.clock()
 split_xml(fulldoc)
-clear_file()
-scrape_multi(xmldocs=xmldocs)
-
+if not logParsed:
+    clear_file()
+    scrape_multi(xmldocs=xmldocs)
+elapsed = (time.clock() - start)
+print 'Time elapsed:', elapsed
