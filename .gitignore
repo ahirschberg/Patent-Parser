@@ -3,3 +3,5 @@
 *.zip
 *.swp
 *.pyc
+xml_output
+*.dtd
