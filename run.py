@@ -31,25 +31,32 @@ xmldocs = [] # split_xml saves the split xml lists here
 xmliteration = 0 # Progression through xmldocs
 
 def main():
+    # Clear csv file
+    clear_file()
     pageurl = 'http://patents.reedtech.com/'
-    print 'Getting webpage', pageurl
+    print 'Getting webpage', pageurl + '...',
     # Get patent urls from webpage
     urls = getUrlList(pageurl + 'parbft.php')
+    print 'Done.'
     #urls = [['/pa010315.zip', 'emulate', '.']]
+    if not os.path.exists(getwd() + '/temp/'):
+        os.makedirs(getwd() + '/temp/')
     i = len(urls) - 1
-    print i
     # Iterate through urls from oldest to newest, downloading and parsing each one
     while i >= 0:
-        print 'i is', i 
         url = urls[i]
-        if not os.path.exists(getwd() + '/temp/'):
-            os.makedirs(getwd() + '/temp/')
-        response = urllib.urlretrieve(pageurl + url[0], getwd() + '/temp/' + getUrlFilename(url[0]), reporthook)
-        #response = (open(getwd() + url[0]), '')
-        print 'Got response:', response
+        tempzip = getwd() + '/temp/' + getUrlFilename(url[0])
+        if os.path.isfile(tempzip):
+            print 'Found', getUrlFilename(url[0]), 'on disk, not downloading.'
+            response = tempzip
+        else:
+            print 'Downloading', getUrlFilename(url[0]), 'from server.'
+            response = (urllib.urlretrieve(pageurl + url[0], tempzip, reporthook))[0]
+            print '\n'
+        print 'Got response:', '\'' + response + '\''
         
         fulldoc = None
-        with zipfile.ZipFile(response[0], 'r') as myzip:
+        with zipfile.ZipFile(response, 'r') as myzip:
             xmlname = getUrlFilename(url[0], True) + '.xml'
             # Patent application xml is not always in root, namelist() gets all files within zip
             for filename in myzip.namelist():
@@ -58,14 +65,20 @@ def main():
                     print 'Found %s in %s' % (xmlname, response[0])
                     fulldoc = myzip.open(filename)
         
+
+        # Reset xmldocs to an empty list
+        global xmldocs
+        xmldocs = []
+        # Reset xmlinteration to 0
+        global xmliteration
+        xmliteration = 0
         split_xml(fulldoc)
-        if not logParsed:
-            clear_file()
-            scrape_multi(xmldocs=xmldocs)
+        scrape_multi(xmldocs=xmldocs)
         
         i-= 1
-        # For debugging, break after one iter
-        break
+        # DB - For debugging, break after one iter
+        #break
+
 
 
 # Get working directory
@@ -149,7 +162,7 @@ def split_xml(fulldoc):
             # Debug Break-If this is uncommented, it will split only a set maximum of times
             #if (n_iter > 10):
             #    return 
-    print 'Done.'
+    print 'Done with length %d.' % len(xmldocs)
 
 
 def formatTag(tag, close=False):
@@ -158,6 +171,7 @@ def formatTag(tag, close=False):
 
 
 def scrape_multi(xmldocs):
+    print 'Beginning scrape of %s documents' % len(xmldocs)
     for xml in xmldocs:
         scrape(xml)
         global xmliteration
