@@ -6,16 +6,16 @@ import sys
 import zipfile
 import patparser
 
-cleanupMode = 0 # Cleanup mode for files: 0 is none, 1 will remove all extracted directory trees, and 2 will remove the directory trees and their zip files
 
 def main():
     # Clear csv file
     clear_file()
-    pageurl = 'http://patents.reedtech.com/'
+    pageurl = 'https://www.google.com/googlebooks/uspto-patents-applications-text.html'
     print 'Getting webpage', pageurl + '...',
     # Get patent urls from webpage
-    urls = patparser.getUrlList(pageurl + 'parbft.php')
-    print 'Done.'
+    urls = patparser.getUrlList(pageurl)
+    removeDownloaded(urls)
+    print 'Done, found %d urls' % len(urls)
     #urls = [['/pa010315.zip', 'emulate', '.']]
     if not os.path.exists(getwd() + '/temp/'):
         os.makedirs(getwd() + '/temp/')
@@ -38,26 +38,26 @@ def main():
         
         i-= 1
         # DB - For debugging, break after one iter
-        if i < len(urls) - 15:
+        if int(splitDate(urls[i], True)[0]) > 1:
             print 'Break at i=%s' % i
             break
 
 
 # Get zip file and unzip, setting fulldoc to a value
 def get_xml(pageurl, url, forcedl=False):
-    tempzip = getwd() + '/temp/' + getUrlFilename(url[0])
+    tempzip = getwd() + '/temp/' + getUrlFilename(url)
     if os.path.isfile(tempzip) and not forcedl:
-        print 'Found', getUrlFilename(url[0]), 'on disk, not downloading.'
+        print 'Found', getUrlFilename(url), 'on disk, not downloading.'
         response = tempzip
     else:
-        print 'Downloading', getUrlFilename(url[0]), 'from server.'
-        response = (urllib.urlretrieve(pageurl + url[0], tempzip, reporthook))[0]
+        print 'Downloading', url, 'from server.'
+        response = (urllib.urlretrieve(url, tempzip, reporthook))[0]
         print '\n'
     print 'Got response:', '\'' + response + '\''
     
     fulldoc = None
     with zipfile.ZipFile(response, 'r') as myzip:
-        xmlname = getUrlFilename(url[0], True) + '.xml'
+        xmlname = getUrlFilename(url, True) + '.xml'
         # Patent application xml is not always in root, namelist() gets all files within zip
         for filename in myzip.namelist():
             print filename
@@ -77,6 +77,37 @@ def getUrlFilename(url, remftype=False):
     # Gets the string from the last / character to the end (for example http://patents.reedtech.com/.../ipa140213.zip would return ipa140213.zip
     return url[url.rfind('/') + 1: url.rfind('.') if remftype else len(url)]
 
+
+# Remove any already downloaded zips from the download list
+def removeDownloaded(urls):
+    for url in urls:
+        for f in os.listdir(getwd() + '/temp'):
+            if f == getUrlFilename(url):
+                # Check for bad/incomplete files
+                try:
+                    zipfile.ZipFile(getwd() + '/temp/' + f, 'r')
+                    urls.remove(url)
+                    print 'Removed %s as it was already downloaded' % getUrlFilename(url)
+                except zipfile.BadZipfile:
+                    print f, 'is a bad zip file, not removing from dl list.'
+
+# Split the date of the filename into yy, mm, dd.  Optionally call getUrlFilename on the string
+def splitDate(url, convertName=False):
+    datearr = []
+    if convertName:
+        url = getUrlFilename(url, True)
+    
+    date = re.sub('[^0-9]', '', url)
+    if len(date) == 6:
+        # Iterate 0, 2, 4, getting substrings [0,2],[2,4],[4,6].  Python does some pretty cool stuff
+        for i in xrange(0, len(date), 2):
+            #print 'date[%d : %d]' % (i, i+2)
+            datearr.append(date[i : i + 2])
+    else:
+        raise Exception('Date string had length %d, expected 6' % len(date))
+    
+    return datearr
+ 
 
 # Adapted from http://blog.moleculea.com/2012/10/04/urlretrieve-progres-indicator/
 def reporthook(count, block_size, total_size):
@@ -141,6 +172,9 @@ def write_data(datalist):
 
 if __name__ == '__main__':
     start = time.clock()
+    #url = 'http://storage.googleapis.com/patents/appl_full_text/2003/pa031002.zip'
+    #tempzip = getwd() + '/temp/' + getUrlFilename(url)
+    #urllib.urlretrieve(url, tempzip, reporthook)
     main()
     elapsed = (time.clock() - start)
     print '\nTime elapsed:', elapsed

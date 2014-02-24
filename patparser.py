@@ -26,30 +26,11 @@ def getUrlList(url):
     response = urllib.urlopen(url)
     soup = BeautifulSoup(response, ["lxml", "html"])
     result = []
-    for table in soup.find_all('table'):
-        # If table has class bulktable, then it contains the xml urls
-        if table['class'] == ['bulktable']:
-            for tr in table.find_all('tr'):
-                trVal = []
-                # Only find a set number of patent urls (for debugging)
-                #if len(result) > 0:
-                #    print 'Result', result
-                #    return result
-                for td in tr.find_all('td'):
-                    # Add the trVal to the result. Although trVal is empty, due to how objects work it will still be affected by the tag/text append statements below
-                    link = td.find('a')
-                    if str(type(link)) == "<class 'bs4.element.Tag'>": 
-                        trVal.append(link.get('href'))
-                    # If the first <td> is not a url, it must be a heading and should be skipped
-                    elif len(trVal) == 0:
-                        break
-                    # If the data is not a link, then it is either file information or date (in that order), which could be useful
-                    else:
-                        trVal.append(td.text)
-                
-                # If nothing of value was found, do not add the values to the result
-                if len(trVal) > 0:
-                    result.append(trVal)
+    # Google downloading
+    for link in soup.find_all('a'):
+        if link.text.strip()[:3] == 'ipa' or link.text.strip()[:2] == 'pa':
+            result.append(link.get('href'))
+            #print 'Appending %s' % link.get('href')
     return result 
 
 # The parser will not parse past the second dtd statement, so this will split each xml segment into its own file in memory
