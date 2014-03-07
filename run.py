@@ -5,6 +5,8 @@ import time
 import sys
 import signal
 import zipfile
+import codecs
+
 import patparser
 
 # For safely exiting after a scrape, not during it
@@ -17,7 +19,8 @@ file_writer = None
 
 def main():
     # Clear csv file
-    #file_writer.clear_file()
+    file_writer.clear_file()
+    file_writer.write_header(patparser.tagList)
 
     # Get patent urls from webpage
     pageurl = 'https://www.google.com/googlebooks/uspto-patents-applications-text.html'
@@ -181,9 +184,14 @@ class CSVFileWriter():
     datalist = []
 
     def getCSV(self, mode='w'):
-        f = open(getwd() + '/output.csv', mode)
+        f = codecs.open(getwd() + '/output.csv', mode, 'utf-8-sig')
         return f
 
+    def write_header(self, tagList):
+        f = self.getCSV()
+        f.write(','.join(tagList))
+        f.write('\n')
+        f.close()
 
     def write_output(self, f, output_str):
         # If line doesn't already have line break at end, add one

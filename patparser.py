@@ -20,25 +20,25 @@ import re
             'continuity-data>division-of' # Parent Case - cases in <parent-child>? 
             ]'''
 
-tagList = [ 'us-patent-application',
-            'date-publ', 
+tagList = [ 'publication-reference>document-id>date',
             'invention-title',
-            'abstract',
+            'abstract>p',
             'us-parties>inventors',
-            'us-related-documents', #?
-            'document-id>doc-number',
+            '?Something?',
+            'application-reference>document-id>doc-number',
             #US filing date
             'pct-or-regional-filing-data>document-id>date', #?
             'pct-or-regional-filing-data>document-id>doc-number', #?
             'pct-or-regional-filing-data>us-371c124-date',
             'pct-or-regional-publishing-data>document-id>doc-number', #?
             'pct-or-regional-publishing-data>document-id>date', #?
-            'related-publication',
+            'related-publication>document-id>doc-number',
             'us-related-documents', #?
-            #Govt interest?
-            'parent-doc' #?
+            '?government interest', #Govt interest?
+            'us-related-documents>parent-doc>document-id>doc-number' #?
             ]
 
+PAPP_TAG = 'us-patent-application'
 
 xmldocs = [] # split_xml saves the split xml lists here 
 xmliteration = 0 # Progression through xmldocs
@@ -78,10 +78,10 @@ def split_xml(fulldoc):
         xml.append(line)
         
         # Try and find where the tag changes so I can patch it in
-        if line.strip().find(formatTag(tagList[0])) >= 0:
+        if line.strip().find(formatTag(PAPP_TAG)) >= 0:
             found = True
 
-        if (line.strip().find(formatTag(tagList[0], True)) >= 0):
+        if (line.strip().find(formatTag(PAPP_TAG, True)) >= 0):
             # Clone the list and append it to xmldocs
             xmldocs.append(list(xml))
             # Write to file (should be commmented out, for debugging purposes
@@ -135,8 +135,8 @@ def get_govt_interest(xmllist):
     opentag = False
     #print 'Looking for govt interest...'
     for line in xmllist:
-        startpos = line.find('<federal-research-statement>')
-        endpos = line.find('</federal-research-statement>')
+        startpos = line.find('<?federal-research-statement description="Federal Research Statement" end="lead"?>')
+        endpos = line.find(  '<?federal-research-statement description="Federal Research Statement" end="lead"?>')
         if startpos >= 0:
             opentag = True
 
@@ -154,17 +154,17 @@ def get_govt_interest(xmllist):
             if (standardline.find('nsf') >= 0 or re.sub('[ ]', '', standardline).find('nationalsciencefoundation') >= 0):
                 return True
         if endpos >= 0:
-            return False
+            return True#False
     return False
 
 
 def parse_xml(soup, tag):
     finaltag = None #The tag object which will be printed or returned at the end of the scrape
     result = 'None'
-    #print '=======Now searching tag', tag + '======='
+    print '=======Now searching tag', tag + '======='
     
     # (Re)sets subsoup to the top of the xml tree
-    subsoup = soup.find('patent-application-publication')
+    subsoup = soup.find(PAPP_TAG)
     tagtree = tag.split('>')
     if len(tagtree) > 1:
         #print 'tagtree length:', len(tagtree)

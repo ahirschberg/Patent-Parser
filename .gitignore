@@ -1,7 +1,9 @@
 I20110106Sample/*
 *.xml
+*.XML
 *.*~
 *.zip
+*.ZIP
 *.swp
 *.pyc
 xml_output
