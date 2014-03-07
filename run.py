@@ -3,25 +3,39 @@ import os
 import re
 import time
 import sys
+import signal
 import zipfile
 import patparser
 
+# For safely exiting after a scrape, not during it
+scraping = False
+break_scrape = False
+
+download_directory = '/temp/'
+
+file_writer = None 
 
 def main():
     # Clear csv file
-    clear_file()
+    #file_writer.clear_file()
+
+    # Get patent urls from webpage
     pageurl = 'https://www.google.com/googlebooks/uspto-patents-applications-text.html'
     print 'Getting webpage', pageurl + '...',
-    # Get patent urls from webpage
-    urls = patparser.getUrlList(pageurl)
-    removeDownloaded(urls)
-    print 'Done, found %d urls' % len(urls)
-    #urls = [['/pa010315.zip', 'emulate', '.']]
-    if not os.path.exists(getwd() + '/temp/'):
-        os.makedirs(getwd() + '/temp/')
-    i = len(urls) - 1
+    urls = []
+
+    for url in patparser.getUrlList(pageurl):
+        if int(splitDate(url, True)[0]) >= 7:
+            urls.append(url)
+    #urls = ['pa010531.zip']
+    
+    numremoved = 0#removeDownloaded(urls)
+    print 'Found %d urls (%d removed because they were already downloaded)' % (len(urls), numremoved)
+    if not os.path.exists(getwd() + download_directory):
+        os.makedirs(getwd() + download_directory)
+    i = 0
     # Iterate through urls from oldest to newest, downloading and parsing each one
-    while i >= 0:
+    while i < len(urls):
         # Reset xmldocs to an empty list
         patparser.xmldocs = []
         # Reset xmliteration to 0
@@ -31,21 +45,41 @@ def main():
             fulldoc = get_xml(pageurl, urls[i])
         except zipfile.BadZipfile:
             print 'Found bad zip file, attempting to redownload'
-            time.sleep(0.5)
             fulldoc = get_xml(pageurl, urls[i], True)
-        patparser.split_xml(fulldoc)
+        
+        # Check for patent-application-publication (will help me narrow down when it changes)
+        
+        try:
+            f = open(getwd() + download_directory + '.breakpoint', 'w')
+            f.write('')
+            f.close()
+            patparser.split_xml(fulldoc)
+        except KeyboardInterrupt:
+            f = open(getwd() + download_directory + '.breakpoint', 'w')
+            f.write(getUrlFilename(urls[i]))
+            f.close()
+            print 'Wrote \'%s\' to %s' % (getUrlFilename(urls[i]), f)
+            sys.exit(1)
+
+        
+        global scraping
+        scraping = True
         patparser.scrape_multi()
         
-        i-= 1
-        # DB - For debugging, break after one iter
-        if int(splitDate(urls[i], True)[0]) > 1:
-            print 'Break at i=%s' % i
-            break
+        file_writer.write_data(patparser.datalists)
+        # If Control+C was pressed during scrape, then exit
+        if break_scrape:
+            sys.exit(1)
 
+        scraping = False
+
+        i+= 1
+        # DB - For debugging, break at a certain point
+        break 
 
 # Get zip file and unzip, setting fulldoc to a value
 def get_xml(pageurl, url, forcedl=False):
-    tempzip = getwd() + '/temp/' + getUrlFilename(url)
+    tempzip = getwd() + download_directory + getUrlFilename(url)
     if os.path.isfile(tempzip) and not forcedl:
         print 'Found', getUrlFilename(url), 'on disk, not downloading.'
         response = tempzip
@@ -80,17 +114,36 @@ def getUrlFilename(url, remftype=False):
 
 # Remove any already downloaded zips from the download list
 def removeDownloaded(urls):
+    remove = []
+    forceinclude = ''
+
+    # Try to get the filename of a breakpoint
+    try:
+        f = open(getwd() + download_directory + '.breakpoint')
+        
+        # Get string on first line
+        for line in f:
+            forceinclude = line
+            break
+    except IOError:
+        pass
+
     for url in urls:
-        for f in os.listdir(getwd() + '/temp'):
-            if f == getUrlFilename(url):
+        for f in os.listdir(getwd() + download_directory[:-1]):
+            if f == getUrlFilename(url) and f != forceinclude:
                 # Check for bad/incomplete files
                 try:
-                    zipfile.ZipFile(getwd() + '/temp/' + f, 'r')
-                    urls.remove(url)
-                    print 'Removed %s as it was already downloaded' % getUrlFilename(url)
+                    zipfile.ZipFile(getwd() + download_directory + f, 'r')
+                    remove.append(url)
+                    #print 'Removed %s as it was already downloaded' % getUrlFilename(url)
                 except zipfile.BadZipfile:
-                    print f, 'is a bad zip file, not removing from dl list.'
+                    #print '\n' + f, 'is a bad zip file, not removing from dl list.'
+                    pass
 
+    [urls.remove(url) for url in remove]
+    return len(remove)
+
+        
 # Split the date of the filename into yy, mm, dd.  Optionally call getUrlFilename on the string
 def splitDate(url, convertName=False):
     datearr = []
@@ -123,58 +176,81 @@ def reporthook(count, block_size, total_size):
     sys.stdout.flush()
 
 
-# Put in own method to make logic less cluttered
-def tag_name_contains(descend, string):
-    return descend != None and str(type(descend)) == '<class \'bs4.element.Tag\'>' and descend.name != None and descend.name.find(string) != -1
+class CSVFileWriter():
+
+    datalist = []
+
+    def getCSV(self, mode='w'):
+        f = open(getwd() + '/output.csv', mode)
+        return f
 
 
-def write_output(f, output_str):
-    # If line doesn't already have line break at end, add one
-    if len(output_str) > 0 and output_str[-1] != '\n':
-        f.write(output_str + '\n')
-    else:
-        f.write(output_str)
+    def write_output(self, f, output_str):
+        # If line doesn't already have line break at end, add one
+        if len(output_str) > 0 and output_str[-1] != '\n':
+            f.write(output_str + '\n')
+        else:
+            f.write(output_str)
 
 
-def setup_datalist(datalist):
-    for i in xrange(0, len(datalist)):
-        data = datalist[i].strip()
-        # Fix for inventors tag having newline characters
-        if data.find(' ') > 0:
-            data = '\'' + data + '\''
-        datalist[i] = data
-    return datalist
+    def setup_datalist(self, datalist):
+        for i in xrange(0, len(datalist)):
+            data = re.sub('\n+', ' ', datalist[i][1]).strip()
+
+            datalist[i][1] = data
+        return datalist
 
 
-def clear_file():
-    f = open(os.path.dirname(os.path.realpath(__file__)) + '/output.csv', 'w') 
-    f.write('')
-    f.close()
+    def clear_file(self):
+        f = self.getCSV()
+        f.write('')
+        f.close()
 
 
-def write_data(datalist):
-    count = 0
-    f = open(os.path.dirname(os.path.realpath(__file__)) + '/output.csv', 'a') 
+    def write_data(self, datalists):
+        count = 0
+        #f = open(os.path.dirname(os.path.realpath(__file__)) + '/output.csv', 'a') 
+        f = self.getCSV('a')
+
+        for datalist in datalists:
+            if datalist != None:
+                datalist = self.setup_datalist(datalist) 
+                
+                tempdatalist = []
+                [tempdatalist.append(data[1]) for data in datalist]
+
+                output = ', '.join(tempdatalist)
+                #print output
+                self.write_output(f=f, output_str=output)
+                #write_output(f=f, output_str='-')
+            count += 1
+
+        f.close()
+
+
+def safe_exit(signum, frame):
+    # Reset original signal handler
+    signal.signal(signal.SIGINT, original_sigint)
     
-    for i in xrange(0, len(datalist)):
-        datalist[i] = (datalist[i].replace(' \n \n \n ', ' - '))
-        datalist[i] = (datalist[i].replace('\n', ''))
-        
-    datalist = setup_datalist(datalist) 
-    output = ', '.join(datalist)
-    #print output
-    write_output(f=f, output_str=output)
-    #write_output(f=f, output_str='-')
-    count += 1
-
-    f.close()
+    if scraping:
+        print 'Program is currently scraping; will exit once done.'
+        global break_scrape
+        break_scrape = True
+    else:
+        # Make Ctrl+C behave normally if not scraping
+        raise KeyboardInterrupt()
 
 
 if __name__ == '__main__':
     start = time.clock()
-    #url = 'http://storage.googleapis.com/patents/appl_full_text/2003/pa031002.zip'
-    #tempzip = getwd() + '/temp/' + getUrlFilename(url)
-    #urllib.urlretrieve(url, tempzip, reporthook)
+
+    # Catch Control + C so that you cannot exit during a scrape
+    original_sigint = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGINT, safe_exit)
+    
+    file_writer = CSVFileWriter()
+    patparser.bindFileWriter(file_writer)
+
     main()
     elapsed = (time.clock() - start)
     print '\nTime elapsed:', elapsed

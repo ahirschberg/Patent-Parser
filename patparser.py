@@ -1,8 +1,9 @@
 from bs4 import BeautifulSoup
 import urllib
 import sys
+import re
 
-tagList = [ 'patent-application-publication', # Enclosing tags
+'''tagList = [ 'patent-application-publication', # Enclosing tags
             'document-id>document-date', # Date (published?)
             'title-of-invention', # Title of invention
             'subdoc-abstract>paragraph', # Abstract
@@ -17,12 +18,42 @@ tagList = [ 'patent-application-publication', # Enclosing tags
             'cross-reference-to-related-applications>paragraph', # Related Patent Documents
             'subdoc-description>federal-research-statement>paragraph-federal-research-statement', # Government Interest? - Paragraph acknowledging NSF
             'continuity-data>division-of' # Parent Case - cases in <parent-child>? 
+            ]'''
+
+tagList = [ 'us-patent-application',
+            'date-publ', 
+            'invention-title',
+            'abstract',
+            'us-parties>inventors',
+            'us-related-documents', #?
+            'document-id>doc-number',
+            #US filing date
+            'pct-or-regional-filing-data>document-id>date', #?
+            'pct-or-regional-filing-data>document-id>doc-number', #?
+            'pct-or-regional-filing-data>us-371c124-date',
+            'pct-or-regional-publishing-data>document-id>doc-number', #?
+            'pct-or-regional-publishing-data>document-id>date', #?
+            'related-publication',
+            'us-related-documents', #?
+            #Govt interest?
+            'parent-doc' #?
             ]
+
 
 xmldocs = [] # split_xml saves the split xml lists here 
 xmliteration = 0 # Progression through xmldocs
 
-def getUrlList(url):
+# Will contain sets of the relevant scraped tags
+datalists = []
+
+file_writer = None
+
+def bindFileWriter(fw):
+    global file_writer
+    file_writer = fw
+    print 'Successfully bound file writer instance'
+
+def getUrlList(url, sort=True):
     response = urllib.urlopen(url)
     soup = BeautifulSoup(response, ["lxml", "html"])
     result = []
@@ -31,6 +62,7 @@ def getUrlList(url):
         if link.text.strip()[:3] == 'ipa' or link.text.strip()[:2] == 'pa':
             result.append(link.get('href'))
             #print 'Appending %s' % link.get('href')
+    if sort: result = sorted(result, key=lambda str: re.sub('[^0-9]', '', str))
     return result 
 
 # The parser will not parse past the second dtd statement, so this will split each xml segment into its own file in memory
@@ -39,9 +71,16 @@ def split_xml(fulldoc):
     lnum = 0
     n_iter = 0
     print 'Splitting xml, please wait...'
+    
+    found = False
     for line in fulldoc:
         lnum += 1
         xml.append(line)
+        
+        # Try and find where the tag changes so I can patch it in
+        if line.strip().find(formatTag(tagList[0])) >= 0:
+            found = True
+
         if (line.strip().find(formatTag(tagList[0], True)) >= 0):
             # Clone the list and append it to xmldocs
             xmldocs.append(list(xml))
@@ -52,22 +91,25 @@ def split_xml(fulldoc):
             xml = []
             sys.stdout.write("\rSplit %d on line %d ..." % (n_iter, lnum))
             sys.stdout.flush()
+            if n_iter >= 393:
+                break
+            
 
-            # Debug Break-If this is uncommented, it will split only a set maximum of times
-            #if (n_iter > 10):
-            #    return 
     print 'Done with length %d.' % len(xmldocs)
 
 def scrape_multi():
-    print 'Beginning scrape of %s documents' % len(xmldocs)
+    #print 'Beginning scrape of %s documents' % len(xmldocs)
     for xml in xmldocs:
-        scrape(xml)
+        #Add data to datalist
+        datalists.append(scrape(xml))
         global xmliteration
         xmliteration += 1
+    # Add line return to output
+    print ''
 
 
 def scrape(xmllist):
-    sys.stdout.write("\rScraping %s of %s." % (xmliteration + 1, len(xmldocs))),
+    sys.stdout.write("\rScraping %s of %s." % (xmliteration + 1, len(xmldocs)))
     sys.stdout.flush()
     
     # Gets the government interest field and looks for NSF or national science foundation
@@ -84,26 +126,32 @@ def scrape(xmllist):
 
     for tag in tagList:
         datalist.append(parse_xml(soup, tag))
-    write_data(datalist)
+
+    return datalist
 
 
 # get Govt Interest without using lxml (prevents a whole xml tree structure from needing to be parsed and created)
 def get_govt_interest(xmllist):
     opentag = False
+    #print 'Looking for govt interest...'
     for line in xmllist:
-        startpos = line.find('<paragraph-federal-research-statement>')
-        endpos = line.find('</paragraph-federal-research-statement>')
+        startpos = line.find('<federal-research-statement>')
+        endpos = line.find('</federal-research-statement>')
         if startpos >= 0:
             opentag = True
 
         if opentag == True:
-            standardline = re.sub("[^a-zA-Z0-9]", "", line).lower() 
+            standardline = re.sub("[^a-zA-Z0-9 ]", "", line).lower() # Remove non alphanumerics or spaces
+            
+            #print 'Govt interest:', line
             
             # If the start or end pos is on the current line, only look at the portion of the line within the tags
-            if startpos >= 0: standardline = standardline[startpos :]
+            if startpos >= 0: 
+                standardline = standardline[startpos :]
             if endpos >= 0: standardline = standardline[: endpos]
-
-            if (standardline.find('nsf') >= 0 or standardline.find('nationalsciencefoundation') >= 0):
+            
+            # Keep only alphanumerics/spaces when searching for the abbreviation, and only keep alphanumerics when searching for the full name
+            if (standardline.find('nsf') >= 0 or re.sub('[ ]', '', standardline).find('nationalsciencefoundation') >= 0):
                 return True
         if endpos >= 0:
             return False
@@ -143,28 +191,32 @@ def parse_xml(soup, tag):
             #print finaltag.prettify()
             templist = []
             if finaltag != None:
-                for descend in finaltag.descendants:
-        
-                    #print 'descend', descend, 'type:', type(descend)
-                    # Find opening tag for new inventors by checking if element is a tag which contains the string 'inventor' but not 'inventors'
-                    if tag_name_contains(descend, 'inventor'):
-                        #print 'Found inventor', descend,  ',', descend.name
-                        if len(templist) > 0:
-                            # Add a closing bracket for a previous element if one exists
-                            templist.append(']')
-
-                        templist.append('[')
-                        templist.append(tagString(descend).strip())
-                # Add a final closing bracket
-                if len(templist) > 0 and templist[-1] != ']':
+                for name in finaltag.find_all('name'):
+                    print name
+                    templist.append('[')
+                    i = 0
+                    for namepart in name.children:
+                        # Append all strings
+                        print namepart, str(type(namepart))
+                        if str(type(namepart)) == '<class \'bs4.element.Tag\'>':
+                            if i > 0:
+                                templist.append(' ')
+                            print 'Appending' + namepart.string
+                            templist.append(namepart.string.strip())
+                            i += 1
+                    
                     templist.append(']')
-                #print templist
                 result = ''.join(templist)
             else:                
                 result = tagString(finaltag)
     
     #print type(result), result
-    return unicode(result)
+    return [tag, unicode(result)]
+
+
+# Put in own method to make logic less cluttered
+def tag_name_contains(descend, string):
+    return descend != None and str(type(descend)) == '<class \'bs4.element.Tag\'>' and descend.name != None and descend.name.find(string) != -1
 
 
 def formatTag(tag, close=False):
