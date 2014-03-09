@@ -27,6 +27,7 @@ def main():
     print 'Getting webpage', pageurl + '...',
     urls = []
 
+    # Remove any xml file from earlier than 2007
     for url in patparser.getUrlList(pageurl):
         if int(splitDate(url, True)[0]) >= 7:
             urls.append(url)

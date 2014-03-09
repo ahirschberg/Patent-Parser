@@ -91,8 +91,8 @@ def split_xml(fulldoc):
             xml = []
             sys.stdout.write("\rSplit %d on line %d ..." % (n_iter, lnum))
             sys.stdout.flush()
-            if n_iter >= 393:
-                break
+            #if n_iter >= 394:
+            #    break
             
 
     print 'Done with length %d.' % len(xmldocs)
@@ -130,32 +130,48 @@ def scrape(xmllist):
     return datalist
 
 
-# get Govt Interest without using lxml (prevents a whole xml tree structure from needing to be parsed and created)
 def get_govt_interest(xmllist):
+    standardline = strfind_tag('<?federal-research-statement description="Federal Research Statement" end="lead"?>','<?federal-research-statement description="Federal Research Statement" end="tail"?>', xmllist)
+    
+    print 'Final text',standardline
+    if standardline == None:
+        return False
+
+    standardline = re.sub("[^a-zA-Z0-9 ]", "", standardline).lower() # Remove non alphanumerics or spaces
+
+    # Keep only alphanumerics/spaces when searching for the abbreviation, and only keep alphanumerics when searching for the full name
+    if (standardline.find('nsf') >= 0 or re.sub('[ ]', '', standardline).find('nationalsciencefoundation') >= 0):
+        return True
+
+    return False
+
+
+
+# get Govt Interest without using lxml (prevents a whole xml tree structure from needing to be parsed and created)
+def strfind_tag(starttag, endtag, xmllist):
     opentag = False
-    #print 'Looking for govt interest...'
+    result = ''
     for line in xmllist:
-        startpos = line.find('<?federal-research-statement description="Federal Research Statement" end="lead"?>')
-        endpos = line.find(  '<?federal-research-statement description="Federal Research Statement" end="lead"?>')
+        startpos = line.find(starttag)
+        endpos = line.find(endtag)
         if startpos >= 0:
             opentag = True
 
-        if opentag == True:
-            standardline = re.sub("[^a-zA-Z0-9 ]", "", line).lower() # Remove non alphanumerics or spaces
-            
-            #print 'Govt interest:', line
-            
+        if opentag == True:           
+            text = line
             # If the start or end pos is on the current line, only look at the portion of the line within the tags
             if startpos >= 0: 
-                standardline = standardline[startpos :]
-            if endpos >= 0: standardline = standardline[: endpos]
+                text = text[startpos:]
+            if endpos >= 0: 
+                # Get substring within tag (subtract startpos in order to remove the offset introduced above
+                text = text[: endpos]
             
-            # Keep only alphanumerics/spaces when searching for the abbreviation, and only keep alphanumerics when searching for the full name
-            if (standardline.find('nsf') >= 0 or re.sub('[ ]', '', standardline).find('nationalsciencefoundation') >= 0):
-                return True
+            result += text
+            print 'Result "%s", startpos %s, endpos %s' % (text, startpos, endpos)
+
         if endpos >= 0:
-            return True#False
-    return False
+            return result[len(starttag) : ]
+    return None
 
 
 def parse_xml(soup, tag):
