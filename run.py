@@ -204,9 +204,13 @@ class CSVFileWriter():
 
     def setup_datalist(self, datalist):
         for i in xrange(0, len(datalist)):
-            data = re.sub('\n+', ' ', datalist[i][1]).strip()
-
+            print 'datalist[%s][1] = %s' % (i, datalist[i]) 
+            # remove newline characters (need to remove \r as well for some reason)
+            data = re.sub('[\r,\n+]', '', datalist[i][1]).strip()
+            # Arbitrary placeholder for comma in text
+            data = re.sub(',', '\u0238', data)
             datalist[i][1] = data
+
         return datalist
 
 

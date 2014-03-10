@@ -23,8 +23,8 @@ import re
 tagList = [ 'publication-reference>document-id>date',
             'invention-title',
             'abstract>p',
-            'us-parties>inventors',
-            '?Something?',
+            'applicants', #'us-parties>inventors',
+            '<?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="lead"?><?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="tail"?>', #
             'application-reference>document-id>doc-number',
             #US filing date
             'pct-or-regional-filing-data>document-id>date', #?
@@ -34,7 +34,7 @@ tagList = [ 'publication-reference>document-id>date',
             'pct-or-regional-publishing-data>document-id>date', #?
             'related-publication>document-id>doc-number',
             'us-related-documents', #?
-            '?government interest', #Govt interest?
+            '<?federal-research-statement description="Federal Research Statement" end="lead"?><?federal-research-statement description="Federal Research Statement" end="tail"?>', #Govt interest?
             'us-related-documents>parent-doc>document-id>doc-number' #?
             ]
 
@@ -48,6 +48,7 @@ datalists = []
 
 file_writer = None
 
+# This may not be necessary, but it binds the file writer instance between the two py files
 def bindFileWriter(fw):
     global file_writer
     file_writer = fw
@@ -91,8 +92,8 @@ def split_xml(fulldoc):
             xml = []
             sys.stdout.write("\rSplit %d on line %d ..." % (n_iter, lnum))
             sys.stdout.flush()
-            #if n_iter >= 394:
-            #    break
+            if n_iter >= 254:
+                break
             
 
     print 'Done with length %d.' % len(xmldocs)
@@ -101,7 +102,8 @@ def scrape_multi():
     #print 'Beginning scrape of %s documents' % len(xmldocs)
     for xml in xmldocs:
         #Add data to datalist
-        datalists.append(scrape(xml))
+        data = scrape(xml)
+        datalists.append(data)
         global xmliteration
         xmliteration += 1
     # Add line return to output
@@ -125,7 +127,15 @@ def scrape(xmllist):
     datalist = []
 
     for tag in tagList:
-        datalist.append(parse_xml(soup, tag))
+        # Non bs4 parsing
+        if (tag[0:2] == '<?'):
+            # Split start and end tags
+            split = tag.find('>') + 1
+            tags = (tag[0:split], tag[split:])
+            print tags
+            datalist.append([tag, strfind_tag(tags[0], tags[1], xmllist)])
+        else:
+            datalist.append([tag, parse_xml(soup, tag)])
 
     return datalist
 
@@ -167,11 +177,11 @@ def strfind_tag(starttag, endtag, xmllist):
                 text = text[: endpos]
             
             result += text
-            print 'Result "%s", startpos %s, endpos %s' % (text, startpos, endpos)
+            #print 'Result "%s", startpos %s, endpos %s' % (text, startpos, endpos)
 
         if endpos >= 0:
             return result[len(starttag) : ]
-    return None
+    return 'None'
 
 
 def parse_xml(soup, tag):
@@ -203,31 +213,34 @@ def parse_xml(soup, tag):
     else:
         finaltag = subsoup.find(tag)
         # Add special formatting for inventors tag
-        if tag == 'inventors':
+        if tag == 'applicants':
             #print finaltag.prettify()
             templist = []
             if finaltag != None:
-                for name in finaltag.find_all('name'):
-                    print name
-                    templist.append('[')
-                    i = 0
-                    for namepart in name.children:
-                        # Append all strings
-                        print namepart, str(type(namepart))
-                        if str(type(namepart)) == '<class \'bs4.element.Tag\'>':
-                            if i > 0:
-                                templist.append(' ')
-                            print 'Appending' + namepart.string
-                            templist.append(namepart.string.strip())
-                            i += 1
-                    
-                    templist.append(']')
+                for name in finaltag.find_all('addressbook'):
+                    if name.find('name') >= 0:
+                        #print name
+                        templist.append('[')
+                        i = 0
+                        # Only append if tag contains name (first-name), (last-name), etc.
+                        for namepart in name.children:
+                            # Append all strings
+                            print namepart, str(type(namepart))
+                            if str(type(namepart)) == '<class \'bs4.element.Tag\'>':
+                                if i > 0:
+                                    templist.append(' ')
+                                print 'Appending' + namepart.string
+                                templist.append(namepart.string.strip())
+                                i += 1
+                        
+                        templist.append(']')
+                
                 result = ''.join(templist)
             else:                
                 result = tagString(finaltag)
     
     #print type(result), result
-    return [tag, unicode(result)]
+    return unicode(result)
 
 
 # Put in own method to make logic less cluttered
