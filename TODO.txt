@@ -1,4 +1,0 @@
-1. Fix tags so that the special ones are stored within tagList
-2. Investigate none values such as missing 2nd value - Item at 91321 
-3. Add multiple csv files for each month
-4. If done with all that, clean up code
