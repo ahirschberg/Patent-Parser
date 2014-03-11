@@ -3,6 +3,8 @@ import urllib
 import sys
 import re
 
+import patutil
+
 '''tagList = [ 'patent-application-publication', # Enclosing tags
             'document-id>document-date', # Date (published?)
             'title-of-invention', # Title of invention
@@ -20,13 +22,14 @@ import re
             'continuity-data>division-of' # Parent Case - cases in <parent-child>? 
             ]'''
 
-tagList = [ 'publication-reference>document-id>date',
+# 2007 tagslist
+tagList07 = [ 'publication-reference>document-id>date',
             'invention-title',
             'abstract>p',
             'applicants', #'us-parties>inventors',
             '<?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="lead"?><?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="tail"?>', #
             'application-reference>document-id>doc-number',
-            #US filing date
+            'application-reference>document-id>date',
             'pct-or-regional-filing-data>document-id>date', #?
             'pct-or-regional-filing-data>document-id>doc-number', #?
             'pct-or-regional-filing-data>us-371c124-date',
@@ -38,6 +41,8 @@ tagList = [ 'publication-reference>document-id>date',
             'us-related-documents>parent-doc>document-id>doc-number' #?
             ]
 
+tagList = tagList07
+
 PAPP_TAG = 'us-patent-application'
 
 xmldocs = [] # split_xml saves the split xml lists here 
@@ -47,12 +52,6 @@ xmliteration = 0 # Progression through xmldocs
 datalists = []
 
 file_writer = None
-
-# This may not be necessary, but it binds the file writer instance between the two py files
-def bindFileWriter(fw):
-    global file_writer
-    file_writer = fw
-    print 'Successfully bound file writer instance'
 
 def getUrlList(url, sort=True):
     response = urllib.urlopen(url)
@@ -192,60 +191,50 @@ def parse_xml(soup, tag):
     # (Re)sets subsoup to the top of the xml tree
     subsoup = soup.find(PAPP_TAG)
     tagtree = tag.split('>')
-    if len(tagtree) > 1:
-        #print 'tagtree length:', len(tagtree)
-        for i in xrange(0, len(tagtree)):
-            #print i, tagtree[i]
-            if subsoup == None:
-                #print 'WARNING: \'' + tagtree[i - 1] + '\' is none in tag tree:', ', '.join(tagtree)
-                result = 'None'
-                break
-            elif i < len(tagtree) - 1:
-                #print i, '<', len(tagtree), 'adding', tagtree[i], 'to tree.'
-                subsoup = subsoup.find(tagtree[i])
-            else:
-                finaltag = subsoup.find(tagtree[i])
-                #print 'finaltag', finaltag
-                #print 'Found (in tree):', tagString(finaltag)
-                #print tagTreeString(finaltag)
-                result = tagString(finaltag)
+    #print 'tagtree length:', len(tagtree)
+    for i in xrange(0, len(tagtree)):
+        if subsoup == None:
+            #print 'WARNING: \'' + tagtree[i - 1] + '\' is none in tag tree:', ', '.join(tagtree)
+            result = 'None'
+            break
 
-    else:
-        finaltag = subsoup.find(tag)
-        #print 'finaltag:', finaltag
-        # Add special formatting for inventors tag
-        if tag == 'applicants':
-            #print finaltag.prettify()
-            templist = []
-            if finaltag != None:
-                for name in finaltag.find_all('addressbook'):
-                    #print name
-                    templist.append('[')
-                    i = 0
-                    # Only append if tag contains name (first-name), (last-name), etc.
-                    # Iterative
-                    '''for namepart in name.children:
-                        if str(type(namepart)) == '<class \'bs4.element.Tag\'>' and namepart.name.find('name') >= 0:
-                            print namepart, str(type(namepart))
-                            # Append all strings
-                            if i > 0:
-                                templist.append(' ')
-                            print 'Appending' + namepart.string
-                            templist.append(namepart.string.strip())
-                            i += 1'''
-                    # Hard coded
-                    templist.append(name.find('first-name').string)
-                    if (name.find('middle-name') != None):
-                        templist.append(' ' + name.find('middle-name').string)
-                    templist.append(' ' + name.find('last-name').string)
-                        
-                    templist.append(']')
-            
-                result = ''.join(templist)
-        else:                
+        elif i < len(tagtree) - 1: # If not at the end of the tree
+            subsoup = subsoup.find(tagtree[i])
+
+        else: # If at the end of the tree (or if the tree only has one element)
+            finaltag = subsoup.find(tagtree[i])
             result = tagString(finaltag)
 
-    #print type(result), result
+            # Add special formatting for inventors tag
+            if tag == 'applicants':
+                templist = []
+                if finaltag != None:
+                    for name in finaltag.find_all('addressbook'):
+                        #print name
+                        templist.append('[')
+                        i = 0
+                        # Only append if tag contains name (first-name), (last-name), etc.
+                        # Iterative
+                        '''for namepart in name.children:
+                            if str(type(namepart)) == '<class \'bs4.element.Tag\'>' and namepart.name.find('name') >= 0:
+                                print namepart, str(type(namepart))
+                                # Append all strings
+                                if i > 0:
+                                    templist.append(' ')
+                                print 'Appending' + namepart.string
+                                templist.append(namepart.string.strip())
+                                i += 1'''
+                        # Hard coded
+                        templist.append(name.find('first-name').string)
+                        if (name.find('middle-name') != None):
+                            templist.append(' ' + name.find('middle-name').string)
+                        templist.append(' ' + name.find('last-name').string)
+                            
+                        templist.append(']')
+                
+                    result = ''.join(templist)
+
+    print type(result), result
     return unicode(result)
 
 
