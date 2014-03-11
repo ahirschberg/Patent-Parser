@@ -212,33 +212,39 @@ def parse_xml(soup, tag):
 
     else:
         finaltag = subsoup.find(tag)
+        #print 'finaltag:', finaltag
         # Add special formatting for inventors tag
         if tag == 'applicants':
             #print finaltag.prettify()
             templist = []
             if finaltag != None:
                 for name in finaltag.find_all('addressbook'):
-                    if name.find('name') >= 0:
-                        #print name
-                        templist.append('[')
-                        i = 0
-                        # Only append if tag contains name (first-name), (last-name), etc.
-                        for namepart in name.children:
-                            # Append all strings
+                    #print name
+                    templist.append('[')
+                    i = 0
+                    # Only append if tag contains name (first-name), (last-name), etc.
+                    # Iterative
+                    '''for namepart in name.children:
+                        if str(type(namepart)) == '<class \'bs4.element.Tag\'>' and namepart.name.find('name') >= 0:
                             print namepart, str(type(namepart))
-                            if str(type(namepart)) == '<class \'bs4.element.Tag\'>':
-                                if i > 0:
-                                    templist.append(' ')
-                                print 'Appending' + namepart.string
-                                templist.append(namepart.string.strip())
-                                i += 1
+                            # Append all strings
+                            if i > 0:
+                                templist.append(' ')
+                            print 'Appending' + namepart.string
+                            templist.append(namepart.string.strip())
+                            i += 1'''
+                    # Hard coded
+                    templist.append(name.find('first-name').string)
+                    if (name.find('middle-name') != None):
+                        templist.append(' ' + name.find('middle-name').string)
+                    templist.append(' ' + name.find('last-name').string)
                         
-                        templist.append(']')
-                
+                    templist.append(']')
+            
                 result = ''.join(templist)
-            else:                
-                result = tagString(finaltag)
-    
+        else:                
+            result = tagString(finaltag)
+
     #print type(result), result
     return unicode(result)
 
