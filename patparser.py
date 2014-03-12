@@ -6,73 +6,57 @@ import re
 import patutil
 
 '''tagList = [ 'patent-application-publication', # Enclosing tags
-            'document-id>document-date', # Date (published?)
+            'document-id/document-date', # Date (published?)
             'title-of-invention', # Title of invention
-            'subdoc-abstract>paragraph', # Abstract
+            'subdoc-abstract/paragraph', # Abstract
             'inventors', # List of inventors
-            'subdoc-description>cross-reference-to-related-applications', # Cross reference to related applications
-            'domestic-filing-data>application-number>doc-number', # Id number
-            'domestic-filing-data>filing-date', # US Date filed
+            'subdoc-description/cross-reference-to-related-applications', # Cross reference to related applications
+            'domestic-filing-data/application-number/doc-number', # Id number
+            'domestic-filing-data/filing-date', # US Date filed
             # PCT Tags
-            'foreign-priority-data>filing-date', # PCT Filing Date
-            'foreign-priority-data>priority-application-number>doc-number', # PCT Application number
+            'foreign-priority-data/filing-date', # PCT Filing Date
+            'foreign-priority-data/priority-application-number/doc-number', # PCT Application number
 
-            'cross-reference-to-related-applications>paragraph', # Related Patent Documents
-            'subdoc-description>federal-research-statement>paragraph-federal-research-statement', # Government Interest? - Paragraph acknowledging NSF
-            'continuity-data>division-of' # Parent Case - cases in <parent-child>? 
+            'cross-reference-to-related-applications/paragraph', # Related Patent Documents
+            'subdoc-description/federal-research-statement/paragraph-federal-research-statement', # Government Interest? - Paragraph acknowledging NSF
+            'continuity-data/division-of' # Parent Case - cases in <parent-child/? 
             ]'''
 
 class Tags():
-    enclosing = ''
-    pubdate = ''
-    invtitle = ''
-    abstract = ''
-    inventors = ''
-    crossref = ''
-    appnum = ''
-    appdate = ''
-    pct_filedate = ''
-    pct_filenum = ''
-    pct_371cdate = ''
-    pct_pubnum = ''
-    pct_pubdate = ''
-    relatedpub = ''
-    relateddocs = ''
-    govint = ''
-    parentcase = ''
-    
     def setTags(self, year):
         if year >= 07:
             # 2007 tagslist
             self.enclosing = 'us-patent-application'
-            self.pubdate = 'publication-reference>document-id>date'
-            self.invtitle = 'invention-title'
-            self.abstract = 'abstract>p'
-            self.inventors = 'applicants' #'us-parties>inventors'
+            self.pubdate = 'publication-reference/document-id/date' #Published patent document
+            self.invtitle = 'invention-title' #Title of invention
+            self.abstract = 'abstract/p' # Concise summary of disclosure
+            self.inventors = 'applicants' # Applicants information
             self.crossref = '<?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="lead"?><?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="tail"?>' #
-            self.appnum = 'application-reference>document-id>doc-number'
-            self.appdate = 'application-reference>document-id>date'
-            self.pct_filedate = 'pct-or-regional-filing-data>document-id>date' #?
-            self.pct_filenum = 'pct-or-regional-filing-data>document-id>doc-number' #?
-            self.pct_371cdate = 'pct-or-regional-filing-data>us-371c124-date'
-            self.pct_pubnum = 'pct-or-regional-publishing-data>document-id>doc-number' #?
-            self.pct_pubdate = 'pct-or-regional-publishing-data>document-id>date' #?
-            self.relatedpub = 'related-publication>document-id>doc-number'
-            self.relateddocs = 'us-related-documents' #?
+            self.appnum = 'application-reference/document-id/doc-number' # Patent ID
+            self.appdate = 'application-reference/document-id/date' # Patent ID Date or something
+            self.pct_filedate = 'pct-or-regional-filing-data/document-id/date' #
+            self.pct_filenum = 'pct-or-regional-filing-data/document-id/doc-number' #PCT filing number
+            self.pct_371cdate = 'pct-or-regional-filing-data/us-371c124-date' # PCT filing date
+            self.pct_pubnum = 'pct-or-regional-publishing-data/document-id/doc-number' # PCT publishing date
+            self.pct_pubdate = 'pct-or-regional-publishing-data/document-id/date' # PCT publishing date
+            self.priorpub = 'related-publication/document-id/doc-number' # Previously published document about same app
+            self.priorpubdate = 'related-publication/document-id/date' # Date for previously published document
+            self.relateddocs = 'us-related-documents' 
             self.govint = '<?federal-research-statement description="Federal Research Statement" end="lead"?><?federal-research-statement description="Federal Research Statement" end="tail"?>' #Govt interest?
-            self.parentcase = 'us-related-documents>parent-doc>document-id>doc-number' #?
+            self.parentcase = 'us-related-documents/parent-doc/document-id/doc-number' # Parent Case
+            self.childcase = 'us-related-documents/child-doc/document-id/doc-number' # Child Case
         
         if year >= 2012:
             # Figure this out
-            pass
+            self.inventors = 'us-parties/inventors'
     
     def getTags(self, year):
         self.setTags(year)
 
         return [self.pubdate, self.invtitle, self.abstract, self.inventors, self.crossref, self.appnum, self.appdate, 
                 self.pct_filedate, self.pct_filenum, self.pct_371cdate, self.pct_pubnum, self.pct_pubdate,
-                self.relatedpub, self.relateddocs, self.govint, self.parentcase]
-                            
+                self.priorpub, self.relateddocs, self.govint, self.parentcase, self.childcase]
+
 
 xmldocs = [] # split_xml saves the split xml lists here 
 xmliteration = 0 # Progression through xmldocs
@@ -226,7 +210,7 @@ def parse_xml(soup, tag):
     # (Re)sets subsoup to the top of the xml tree
     print tags
     subsoup = soup.find(tags.enclosing)
-    tagtree = tag.split('>')
+    tagtree = tag.split('/')
     #print 'tagtree length:', len(tagtree)
     for i in xrange(0, len(tagtree)):
         if subsoup == None:
