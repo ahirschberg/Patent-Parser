@@ -12,17 +12,18 @@ def getUrlFilename(url, remftype=False):
 
 
 # Split the date of the filename into yy, mm, dd.  Optionally call getUrlFilename on the string
-def splitDate(url, convertName=False):
+def splitDate(url, makeint=False):
     datearr = []
-    if convertName:
-        url = getUrlFilename(url, True)
+    url = getUrlFilename(url, True)
     
     date = re.sub('[^0-9]', '', url)
     if len(date) == 6:
         # Iterate 0, 2, 4, getting substrings [0,2],[2,4],[4,6].  Python does some pretty cool stuff
         for i in xrange(0, len(date), 2):
             #print 'date[%d : %d]' % (i, i+2)
-            datearr.append(date[i : i + 2])
+            dateslice = date[i : i + 2]
+            if makeint: dateslice = int(dateslice)
+            datearr.append(dateslice)
     else:
         raise Exception('Date string had length %d, expected 6' % len(date))
     

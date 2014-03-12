@@ -22,28 +22,57 @@ import patutil
             'continuity-data>division-of' # Parent Case - cases in <parent-child>? 
             ]'''
 
-# 2007 tagslist
-tagList07 = [ 'publication-reference>document-id>date',
-            'invention-title',
-            'abstract>p',
-            'applicants', #'us-parties>inventors',
-            '<?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="lead"?><?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="tail"?>', #
-            'application-reference>document-id>doc-number',
-            'application-reference>document-id>date',
-            'pct-or-regional-filing-data>document-id>date', #?
-            'pct-or-regional-filing-data>document-id>doc-number', #?
-            'pct-or-regional-filing-data>us-371c124-date',
-            'pct-or-regional-publishing-data>document-id>doc-number', #?
-            'pct-or-regional-publishing-data>document-id>date', #?
-            'related-publication>document-id>doc-number',
-            'us-related-documents', #?
-            '<?federal-research-statement description="Federal Research Statement" end="lead"?><?federal-research-statement description="Federal Research Statement" end="tail"?>', #Govt interest?
-            'us-related-documents>parent-doc>document-id>doc-number' #?
-            ]
+class Tags():
+    enclosing = ''
+    pubdate = ''
+    invtitle = ''
+    abstract = ''
+    inventors = ''
+    crossref = ''
+    appnum = ''
+    appdate = ''
+    pct_filedate = ''
+    pct_filenum = ''
+    pct_371cdate = ''
+    pct_pubnum = ''
+    pct_pubdate = ''
+    relatedpub = ''
+    relateddocs = ''
+    govint = ''
+    parentcase = ''
+    
+    def setTags(self, year):
+        if year >= 07:
+            # 2007 tagslist
+            self.enclosing = 'us-patent-application'
+            self.pubdate = 'publication-reference>document-id>date'
+            self.invtitle = 'invention-title'
+            self.abstract = 'abstract>p'
+            self.inventors = 'applicants' #'us-parties>inventors'
+            self.crossref = '<?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="lead"?><?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="tail"?>' #
+            self.appnum = 'application-reference>document-id>doc-number'
+            self.appdate = 'application-reference>document-id>date'
+            self.pct_filedate = 'pct-or-regional-filing-data>document-id>date' #?
+            self.pct_filenum = 'pct-or-regional-filing-data>document-id>doc-number' #?
+            self.pct_371cdate = 'pct-or-regional-filing-data>us-371c124-date'
+            self.pct_pubnum = 'pct-or-regional-publishing-data>document-id>doc-number' #?
+            self.pct_pubdate = 'pct-or-regional-publishing-data>document-id>date' #?
+            self.relatedpub = 'related-publication>document-id>doc-number'
+            self.relateddocs = 'us-related-documents' #?
+            self.govint = '<?federal-research-statement description="Federal Research Statement" end="lead"?><?federal-research-statement description="Federal Research Statement" end="tail"?>' #Govt interest?
+            self.parentcase = 'us-related-documents>parent-doc>document-id>doc-number' #?
+        
+        if year >= 2012:
+            # Figure this out
+            pass
+    
+    def getTags(self, year):
+        self.setTags(year)
 
-tagList = tagList07
-
-PAPP_TAG = 'us-patent-application'
+        return [self.pubdate, self.invtitle, self.abstract, self.inventors, self.crossref, self.appnum, self.appdate, 
+                self.pct_filedate, self.pct_filenum, self.pct_371cdate, self.pct_pubnum, self.pct_pubdate,
+                self.relatedpub, self.relateddocs, self.govint, self.parentcase]
+                            
 
 xmldocs = [] # split_xml saves the split xml lists here 
 xmliteration = 0 # Progression through xmldocs
@@ -52,6 +81,8 @@ xmliteration = 0 # Progression through xmldocs
 datalists = []
 
 file_writer = None
+
+tags = Tags()
 
 def getUrlList(url, sort=True):
     response = urllib.urlopen(url)
@@ -78,10 +109,10 @@ def split_xml(fulldoc):
         xml.append(line)
         
         # Try and find where the tag changes so I can patch it in
-        if line.strip().find(formatTag(PAPP_TAG)) >= 0:
+        if line.strip().find(formatTag(tags.enclosing)) >= 0:
             found = True
 
-        if (line.strip().find(formatTag(PAPP_TAG, True)) >= 0):
+        if (line.strip().find(formatTag(tags.enclosing, True)) >= 0):
             # Clone the list and append it to xmldocs
             xmldocs.append(list(xml))
             # Write to file (should be commmented out, for debugging purposes
@@ -97,8 +128,10 @@ def split_xml(fulldoc):
 
     print 'Done with length %d.' % len(xmldocs)
 
-def scrape_multi():
-    #print 'Beginning scrape of %s documents' % len(xmldocs)
+def scrape_multi(year_):
+    global year
+    year = year_
+
     for xml in xmldocs:
         #Add data to datalist
         data = scrape(xml)
@@ -125,14 +158,15 @@ def scrape(xmllist):
     # List all scraped data will be stored in
     datalist = []
 
-    for tag in tagList:
+    global tags
+    for tag in tags.getTags(year):
         # Non bs4 parsing
         if (tag[0:2] == '<?'):
             # Split start and end tags
             split = tag.find('>') + 1
-            tags = (tag[0:split], tag[split:])
+            tagpair = (tag[0:split], tag[split:])
             print tags
-            datalist.append([tag, strfind_tag(tags[0], tags[1], xmllist)])
+            datalist.append([tag, strfind_tag(tagpair[0], tagpair[1], xmllist)])
         else:
             datalist.append([tag, parse_xml(soup, tag)])
 
@@ -184,12 +218,14 @@ def strfind_tag(starttag, endtag, xmllist):
 
 
 def parse_xml(soup, tag):
+    global tags
     finaltag = None #The tag object which will be printed or returned at the end of the scrape
     result = 'None'
     print '=======Now searching tag', tag + '======='
-    
+     
     # (Re)sets subsoup to the top of the xml tree
-    subsoup = soup.find(PAPP_TAG)
+    print tags
+    subsoup = soup.find(tags.enclosing)
     tagtree = tag.split('>')
     #print 'tagtree length:', len(tagtree)
     for i in xrange(0, len(tagtree)):

@@ -20,7 +20,6 @@ file_writer = None
 def main():
     # Clear csv file
     file_writer.clear_file()
-    file_writer.write_header(patparser.tagList)
 
     # Get patent urls from webpage
     pageurl = 'https://www.google.com/googlebooks/uspto-patents-applications-text.html'
@@ -29,7 +28,7 @@ def main():
 
     # Remove any xml file from earlier than 2007
     for url in patparser.getUrlList(pageurl):
-        if int(patutil.splitDate(url, True)[0]) >= 7:
+        if patutil.splitDate(url, True)[0] >= 7:
             urls.append(url)
     #urls = ['pa010531.zip']
     
@@ -51,8 +50,9 @@ def main():
             print 'Found bad zip file, attempting to redownload'
             fulldoc = get_xml(pageurl, urls[i], True)
         
-        # Check for patent-application-publication (will help me narrow down when it changes)
-        
+        year = patutil.splitDate(urls[i], True) 
+        file_writer.write_header(patparser.tags.getTags(year))
+
         try:
             f = open(patutil.getwd() + download_directory + '.breakpoint', 'w')
             f.write('')
@@ -68,7 +68,7 @@ def main():
         
         global scraping
         scraping = True
-        patparser.scrape_multi()
+        patparser.scrape_multi(year)
         
         file_writer.write_data(patparser.datalists)
         # If Control+C was pressed during scrape, then exit
