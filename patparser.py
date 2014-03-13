@@ -24,39 +24,45 @@ import patutil
 
 class Tags():
     def setTags(self, year):
+        self.test_var = 'Test Variable'
         if year >= 07:
             # 2007 tagslist
-            self.enclosing = 'us-patent-application'
-            self.pubdate = 'publication-reference/document-id/date' #Published patent document
-            self.invtitle = 'invention-title' #Title of invention
-            self.abstract = 'abstract/p' # Concise summary of disclosure
-            self.inventors = 'applicants' # Applicants information
-            self.crossref = '<?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="lead"?><?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="tail"?>' #
-            self.appnum = 'application-reference/document-id/doc-number' # Patent ID
-            self.appdate = 'application-reference/document-id/date' # Patent ID Date or something
-            self.pct_filedate = 'pct-or-regional-filing-data/document-id/date' #
-            self.pct_filenum = 'pct-or-regional-filing-data/document-id/doc-number' #PCT filing number
-            self.pct_371cdate = 'pct-or-regional-filing-data/us-371c124-date' # PCT filing date
-            self.pct_pubnum = 'pct-or-regional-publishing-data/document-id/doc-number' # PCT publishing date
-            self.pct_pubdate = 'pct-or-regional-publishing-data/document-id/date' # PCT publishing date
-            self.priorpub = 'related-publication/document-id/doc-number' # Previously published document about same app
-            self.priorpubdate = 'related-publication/document-id/date' # Date for previously published document
-            self.relateddocs = 'us-related-documents' 
-            self.govint = '<?federal-research-statement description="Federal Research Statement" end="lead"?><?federal-research-statement description="Federal Research Statement" end="tail"?>' #Govt interest?
-            self.parentcase = 'us-related-documents/parent-doc/document-id/doc-number' # Parent Case
-            self.childcase = 'us-related-documents/child-doc/document-id/doc-number' # Child Case
+            self.ipa_enclosing = 'us-patent-application'
+            self.ipa_pubdate = 'publication-reference/document-id/date' #Published patent document
+            self.ipa_invtitle = 'invention-title' #Title of invention
+            self.ipa_abstract = 'abstract/p' # Concise summary of disclosure
+            self.ipa_inventors = 'applicants' # Applicants information
+            self.ipa_crossref = '<?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="lead"?><?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="tail"?>' #
+            self.ipa_appnum = 'application-reference/document-id/doc-number' # Patent ID
+            self.ipa_appdate = 'application-reference/document-id/date' # Patent ID Date or something
+            self.ipa_pct_filedate = 'pct-or-regional-filing-data/document-id/date' #
+            self.ipa_pct_filenum = 'pct-or-regional-filing-data/document-id/doc-number' #PCT filing number
+            self.ipa_pct_371cdate = 'pct-or-regional-filing-data/us-371c124-date' # PCT filing date
+            self.ipa_pct_pubnum = 'pct-or-regional-publishing-data/document-id/doc-number' # PCT publishing date
+            self.ipa_pct_pubdate = 'pct-or-regional-publishing-data/document-id/date' # PCT publishing date
+            self.ipa_priorpub = 'related-publication/document-id/doc-number' # Previously published document about same app
+            self.ipa_priorpubdate = 'related-publication/document-id/date' # Date for previously published document
+            #self.relateddocs = 'us-related-documents' 
+            self.ipa_govint = '<?federal-research-statement description="Federal Research Statement" end="lead"?><?federal-research-statement description="Federal Research Statement" end="tail"?>' #Govt interest?
+            self.ipa_parentcase = 'us-related-documents/parent-doc/document-id/doc-number' # Parent Case
+            self.ipa_childcase = 'us-related-documents/child-doc/document-id/doc-number' # Child Case
         
-        if year >= 2012:
+        if year >= 12:
             # Figure this out
-            self.inventors = 'us-parties/inventors'
+            self.ipa_inventors = 'us-parties/inventors'
     
     def getTags(self, year):
         self.setTags(year)
+        
+        # Get all variables in Tags that start with ipa_ and append the values to a list
+        tagsList = []
+        for b in iter(self.__dict__):
+             print b
+             if b.find('ipa') >= 0:
+                 tagsList.append(self.__dict__.get(b))
 
-        return [self.pubdate, self.invtitle, self.abstract, self.inventors, self.crossref, self.appnum, self.appdate, 
-                self.pct_filedate, self.pct_filenum, self.pct_371cdate, self.pct_pubnum, self.pct_pubdate,
-                self.priorpub, self.relateddocs, self.govint, self.parentcase, self.childcase]
-
+        return tagsList
+        
 
 xmldocs = [] # split_xml saves the split xml lists here 
 xmliteration = 0 # Progression through xmldocs
@@ -93,10 +99,10 @@ def split_xml(fulldoc):
         xml.append(line)
         
         # Try and find where the tag changes so I can patch it in
-        if line.strip().find(formatTag(tags.enclosing)) >= 0:
+        if line.strip().find(formatTag(tags.ipa_enclosing)) >= 0:
             found = True
 
-        if (line.strip().find(formatTag(tags.enclosing, True)) >= 0):
+        if (line.strip().find(formatTag(tags.ipa_enclosing, True)) >= 0):
             # Clone the list and append it to xmldocs
             xmldocs.append(list(xml))
             # Write to file (should be commmented out, for debugging purposes
@@ -149,7 +155,7 @@ def scrape(xmllist):
             # Split start and end tags
             split = tag.find('>') + 1
             tagpair = (tag[0:split], tag[split:])
-            print tags
+            #print tags
             datalist.append([tag, strfind_tag(tagpair[0], tagpair[1], xmllist)])
         else:
             datalist.append([tag, parse_xml(soup, tag)])
@@ -160,7 +166,7 @@ def scrape(xmllist):
 def get_govt_interest(xmllist):
     standardline = strfind_tag('<?federal-research-statement description="Federal Research Statement" end="lead"?>','<?federal-research-statement description="Federal Research Statement" end="tail"?>', xmllist)
     
-    print 'Final text',standardline
+    #print 'Final text',standardline
     if standardline == None:
         return False
 
@@ -208,8 +214,8 @@ def parse_xml(soup, tag):
     print '=======Now searching tag', tag + '======='
      
     # (Re)sets subsoup to the top of the xml tree
-    print tags
-    subsoup = soup.find(tags.enclosing)
+    #print tags
+    subsoup = soup.find(tags.ipa_enclosing)
     tagtree = tag.split('/')
     #print 'tagtree length:', len(tagtree)
     for i in xrange(0, len(tagtree)):
@@ -254,7 +260,7 @@ def parse_xml(soup, tag):
                 
                     result = ''.join(templist)
 
-    print type(result), result
+    #print type(result), result
     return unicode(result)
 
 

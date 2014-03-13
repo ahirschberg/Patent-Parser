@@ -50,7 +50,7 @@ def main():
             print 'Found bad zip file, attempting to redownload'
             fulldoc = get_xml(pageurl, urls[i], True)
         
-        year = patutil.splitDate(urls[i], True) 
+        year = patutil.splitDate(urls[i], True)[0] 
         file_writer.write_header(patparser.tags.getTags(year))
 
         try:

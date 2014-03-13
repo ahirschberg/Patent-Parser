@@ -1,6 +1,8 @@
 I20110106Sample/*
 TODO.txt
 *.xml
+*.csv
+*.CSV
 *.XML
 *.*~
 *.zip
