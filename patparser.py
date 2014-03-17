@@ -5,26 +5,25 @@ import re
 
 import patutil
 
-'''tagList = [ 'patent-application-publication', # Enclosing tags
-            'document-id/document-date', # Date (published?)
-            'title-of-invention', # Title of invention
-            'subdoc-abstract/paragraph', # Abstract
-            'inventors', # List of inventors
-            'subdoc-description/cross-reference-to-related-applications', # Cross reference to related applications
-            'domestic-filing-data/application-number/doc-number', # Id number
-            'domestic-filing-data/filing-date', # US Date filed
-            # PCT Tags
-            'foreign-priority-data/filing-date', # PCT Filing Date
-            'foreign-priority-data/priority-application-number/doc-number', # PCT Application number
-
-            'cross-reference-to-related-applications/paragraph', # Related Patent Documents
-            'subdoc-description/federal-research-statement/paragraph-federal-research-statement', # Government Interest? - Paragraph acknowledging NSF
-            'continuity-data/division-of' # Parent Case - cases in <parent-child/? 
-            ]'''
-
 class Tags():
+
     def setTags(self, year):
         self.test_var = 'Test Variable'
+
+        if year >= 0: # These tags will probably not work correctly.  The program is only designed for 2007 DTD standard and above 
+            self.ipa_enclosing = 'patent-application-publication', # Enclosing tags
+            self.ipa_pubdate = 'document-id/document-date', # Date (published?)
+            self.ipa_invtitle = 'title-of-invention', # Title of invention
+            self.ipa_abstract = 'subdoc-abstract/paragraph', # Abstract
+            self.ipa_inventors = 'inventors', # List of inventors
+            self.ipa_crossref = 'subdoc-description/cross-reference-to-related-applications/paragraph', # Cross reference to related applications
+            self.ipa_appnum = 'domestic-filing-data/application-number/doc-number', # Id number
+            self.ipa_appdate = 'domestic-filing-data/filing-date', # US Date filed
+            self.ipa_pct_filedate = 'foreign-priority-data/filing-date', # PCT Filing Date
+            self.ipa_pct_pubnum = 'foreign-priority-data/priority-application-number/doc-number', # PCT Application number
+            self.ipa_govint = 'subdoc-description/federal-research-statement/paragraph-federal-research-statement', # Government Interest? - Paragraph acknowledging NSF
+            self.ipa_parentcase = 'continuity-data/division-of' # Parent Case - cases in <parent-child/? 
+
         if year >= 07:
             # 2007 tagslist
             self.ipa_enclosing = 'us-patent-application'
@@ -42,24 +41,68 @@ class Tags():
             self.ipa_pct_pubdate = 'pct-or-regional-publishing-data/document-id/date' # PCT publishing date
             self.ipa_priorpub = 'related-publication/document-id/doc-number' # Previously published document about same app
             self.ipa_priorpubdate = 'related-publication/document-id/date' # Date for previously published document
-            #self.relateddocs = 'us-related-documents' 
             self.ipa_govint = '<?federal-research-statement description="Federal Research Statement" end="lead"?><?federal-research-statement description="Federal Research Statement" end="tail"?>' #Govt interest?
             self.ipa_parentcase = 'us-related-documents/parent-doc/document-id/doc-number' # Parent Case
             self.ipa_childcase = 'us-related-documents/child-doc/document-id/doc-number' # Child Case
+
+            '''# 2007 Patent grant (Needs work)
+            self.ipa_enclosing = 'us-patent-application'
+            self.ipa_pubdate = 'publication-reference/document-id/date' #Published patent document
+            self.ipa_invtitle = 'invention-title' #Title of invention
+            self.ipa_abstract = 'abstract/p' # Concise summary of disclosure
+            self.ipa_inventors = 'applicants' # Applicants information
+            self.ipa_crossref = '<?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="lead"?><?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="tail"?>' #
+            self.ipa_appnum = 'application-reference/document-id/doc-number' # Patent ID
+            self.ipa_appdate = 'application-reference/document-id/date' # Patent ID Date or something
+            self.ipa_pct_filedate = 'pct-or-regional-filing-data/document-id/date' #
+            self.ipa_pct_filenum = 'pct-or-regional-filing-data/document-id/doc-number' #PCT filing number
+            self.ipa_pct_371cdate = 'pct-or-regional-filing-data/us-371c124-date' # PCT filing date
+            self.ipa_pct_pubnum = 'pct-or-regional-publishing-data/document-id/doc-number' # PCT publishing date
+            self.ipa_pct_pubdate = 'pct-or-regional-publishing-data/document-id/date' # PCT publishing date
+            self.ipa_priorpub = 'related-publication/document-id/doc-number' # Previously published document about same app
+            self.ipa_priorpubdate = 'related-publication/document-id/date' # Date for previously published document
+            self.ipa_govint = '<?federal-research-statement description="Federal Research Statement" end="lead"?><?federal-research-statement description="Federal Research Statement" end="tail"?>' #Govt interest?
+            self.ipa_parentcase = 'us-related-documents/parent-doc/document-id/doc-number' # Parent Case
+            self.ipa_childcase = 'us-related-documents/child-doc/document-id/doc-number' # Child Case'''
         
         if year >= 12:
             # Figure this out
             self.ipa_inventors = 'us-parties/inventors'
     
-    def getTags(self, year):
+    def getAppTags(self, year):
+        self.setTags(year)
+
+        return [self.ipa_pubdate,
+                self.ipa_invtitle,
+                self.ipa_abstract,
+                self.ipa_inventors,
+                self.ipa_crossref,
+                self.ipa_appnum,
+                self.ipa_appdate,
+                self.ipa_pct_filedate,
+                self.ipa_pct_filenum,
+                self.ipa_pct_371cdate,
+                self.ipa_pct_pubnum,
+                self.ipa_pct_pubdate,
+                self.ipa_priorpub,
+                self.ipa_priorpubdate,
+                self.ipa_govint,
+                self.ipa_parentcase,
+                self.ipa_childcase]
+        #return self.getTags(year, 'ipa_')
+
+    def getGrantTags(self, year):
+        return self.getTags(year, 'ipg_')
+
+    # Get all variables in Tags that start with a prefix and append the values to a list
+    def getTags(self, year, prefix):
         self.setTags(year)
         
-        # Get all variables in Tags that start with ipa_ and append the values to a list
         tagsList = []
-        for b in iter(self.__dict__):
-             print b
-             if b.find('ipa') >= 0:
-                 tagsList.append(self.__dict__.get(b))
+        for var in iter(self.__dict__):
+             #print b
+             if var[:len(prefix)] == prefix:
+                 tagsList.append(self.__dict__.get(var))
 
         return tagsList
         
@@ -115,7 +158,6 @@ def split_xml(fulldoc):
             if n_iter >= 254:
                 break
             
-
     print 'Done with length %d.' % len(xmldocs)
 
 def scrape_multi(year_):
@@ -149,7 +191,7 @@ def scrape(xmllist):
     datalist = []
 
     global tags
-    for tag in tags.getTags(year):
+    for tag in tags.getAppTags(year):
         # Non bs4 parsing
         if (tag[0:2] == '<?'):
             # Split start and end tags
@@ -202,8 +244,12 @@ def strfind_tag(starttag, endtag, xmllist):
             result += text
             #print 'Result "%s", startpos %s, endpos %s' % (text, startpos, endpos)
 
+        # Return text within the <p> element (for CROSS REFERENCE and GOVERNMENT INTEREST) this works.
         if endpos >= 0:
-            return result[len(starttag) : ]
+            # Without the enclosing tags, it will only recognize the first tag within the result.
+            endresult = '<_enclosing>' + result[len(starttag) : ] + '</_enclosing>'
+            print endresult
+            return unicode(BeautifulSoup(endresult, ['lxml', 'xml']).find('p').get_text())
     return 'None'
 
 

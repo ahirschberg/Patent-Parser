@@ -18,9 +18,7 @@ download_directory = '/temp/'
 file_writer = None 
 
 def main():
-    # Clear csv file
-    file_writer.clear_file()
-
+    
     # Get patent urls from webpage
     pageurl = 'https://www.google.com/googlebooks/uspto-patents-applications-text.html'
     print 'Getting webpage', pageurl + '...',
@@ -30,9 +28,9 @@ def main():
     for url in patparser.getUrlList(pageurl):
         if patutil.splitDate(url, True)[0] >= 7:
             urls.append(url)
-    #urls = ['pa010531.zip']
+    #urls = ['ipa070104.zip']
     
-    numremoved = 0#removeDownloaded(urls)
+    numremoved =  removeParsed(urls, file_writer.getCSVsInDir())
     print 'Found %d urls (%d removed because they were already downloaded)' % (len(urls), numremoved)
     if not os.path.exists(patutil.getwd() + download_directory):
         os.makedirs(patutil.getwd() + download_directory)
@@ -50,32 +48,19 @@ def main():
             print 'Found bad zip file, attempting to redownload'
             fulldoc = get_xml(pageurl, urls[i], True)
         
+        # Split and scrape xml
         year = patutil.splitDate(urls[i], True)[0] 
-        file_writer.write_header(patparser.tags.getTags(year))
-
-        try:
-            f = open(patutil.getwd() + download_directory + '.breakpoint', 'w')
-            f.write('')
-            f.close()
-            patparser.split_xml(fulldoc)
-        except KeyboardInterrupt:
-            f = open(patutil.getwd() + download_directory + '.breakpoint', 'w')
-            f.write(patutil.getUrlFilename(urls[i]))
-            f.close()
-            print 'Wrote \'%s\' to %s' % (patutil.getUrlFilename(urls[i]), f)
-            sys.exit(1)
-
-        
-        global scraping
-        scraping = True
+        patparser.tags.setTags(year)
+        file_writer.setParser(patparser)
+        patparser.split_xml(fulldoc)
         patparser.scrape_multi(year)
         
-        file_writer.write_data(patparser.datalists)
-        # If Control+C was pressed during scrape, then exit
-        if break_scrape:
-            sys.exit(1)
+        # Setup csv for writing
+        file_writer.setFilename(patutil.getUrlFilename(urls[i], True))
+        file_writer.clear_file()
+        file_writer.write_header(patparser.tags.getAppTags(year))
 
-        scraping = False
+        file_writer.write_data(patparser.datalists)
 
         i+= 1
         # DB - For debugging, break at a certain point
@@ -106,8 +91,21 @@ def get_xml(pageurl, url, forcedl=False):
     return fulldoc
 
 
+def removeParsed(urls, csvs):
+    remove = []
+    for url in urls:
+        for csv in csvs:
+            # Compare names of csvs to names of urls, and remove matching ones
+            if patutil.getUrlFilename(csv, True) == patutil.getUrlFilename(url, True):
+               remove.append(url)
+
+    #print urls
+    #print remove
+    [urls.remove(url) for url in remove]
+    return len(remove)
 
 # Remove any already downloaded zips from the download list
+# (Obsolete, removeParsed should be used instead)
 def removeDownloaded(urls):
     remove = []
     forceinclude = ''
@@ -170,8 +168,8 @@ if __name__ == '__main__':
     start = time.clock()
 
     # Catch Control + C so that you cannot exit during a scrape
-    original_sigint = signal.getsignal(signal.SIGINT)
-    signal.signal(signal.SIGINT, safe_exit)
+    #original_sigint = signal.getsignal(signal.SIGINT)
+    #signal.signal(signal.SIGINT, safe_exit)
     
     file_writer = patutil.CSVFileWriter()
 

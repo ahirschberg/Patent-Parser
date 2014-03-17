@@ -33,9 +33,33 @@ def splitDate(url, makeint=False):
 class CSVFileWriter():
 
     datalist = []
+    output_directory = '/output/'
+
+    def setFilename(self, filename):
+        print 'Setting filename to %s' % filename
+        self.filename = filename
+
+
+    def setParser(self, patparser):
+        self.patparser = patparser
+
+    
+    def getCSVsInDir(self):
+        return [f for f in os.listdir(getwd() + self.output_directory[:-1])]
+
 
     def getCSV(self, mode='w'):
-        f = codecs.open(getwd() + '/output.csv', mode, 'utf-8-sig')
+        # Create output directory
+        if not os.path.exists(getwd() + self.output_directory):
+            os.makedirs(getwd() + self.output_directory)
+
+        if self.filename == None:
+            self.filename = 'output.csv'
+
+        if self.filename[-4:] != '.csv':
+            self.filename = self.filename + '.csv'
+        f = codecs.open(getwd() + self.output_directory + self.filename, mode, 'utf-8-sig')
+
         return f
 
     def write_header(self, tagList):
@@ -57,8 +81,12 @@ class CSVFileWriter():
             print 'datalist[%s][1] = %s' % (i, datalist[i]) 
             # remove newline characters (need to remove \r as well for some reason)
             data = re.sub('[\r,\n+]', '', datalist[i][1]).strip()
-            # Arbitrary placeholder for comma in text
-            data = re.sub(',', '\u0238', data)
+            #data = re.sub(',', '\u0238', data)
+            print self.patparser.tags.ipa_inventors, datalist[i]
+            # Denote text fields containing commas and spaces with '', unless it is the inventors field
+            if data.find(',') >= 0 or (data.find(' ') >= 0 and datalist[i][0] != self.patparser.tags.ipa_inventors):
+                print 'adding quotes to', data
+                data = '\'' + data + '\''
             datalist[i][1] = data
 
         return datalist
@@ -87,5 +115,6 @@ class CSVFileWriter():
                 self.write_output(f=f, output_str=output)
                 #write_output(f=f, output_str='-')
             count += 1
-
+        
+        print 'Finished writing to %s' % f.name
         f.close()
