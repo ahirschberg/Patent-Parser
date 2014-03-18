@@ -30,6 +30,17 @@ def splitDate(url, makeint=False):
     return datearr
 
 
+# Debug method to dump split xml documents
+def dump_xml(xml, name):
+    if not os.path.exists(getwd() + '/dump/'):
+        os.makedirs(getwd() + '/dump/')
+
+    f = codecs.open(getwd() + '/dump/' + name, 'w', 'utf-8-sig')
+    print 'Dumping xml to %s.' % f.name
+    f.write(xml)
+    f.close()
+
+
 class CSVFileWriter():
 
     datalist = []
@@ -118,3 +129,5 @@ class CSVFileWriter():
         
         print 'Finished writing to %s' % f.name
         f.close()
+
+    

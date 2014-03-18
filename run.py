@@ -28,10 +28,10 @@ def main():
     for url in patparser.getUrlList(pageurl):
         if patutil.splitDate(url, True)[0] >= 7:
             urls.append(url)
-    #urls = ['ipa070104.zip']
+    urls = ['ipa130103.zip']
     
-    numremoved =  removeParsed(urls, file_writer.getCSVsInDir())
-    print 'Found %d urls (%d removed because they were already downloaded)' % (len(urls), numremoved)
+    numremoved = 0# removeParsed(urls, file_writer.getCSVsInDir())
+    print 'Found %d urls (%d removed because they already had CSV files)' % (len(urls), numremoved)
     if not os.path.exists(patutil.getwd() + download_directory):
         os.makedirs(patutil.getwd() + download_directory)
     i = 0
@@ -96,7 +96,7 @@ def removeParsed(urls, csvs):
     for url in urls:
         for csv in csvs:
             # Compare names of csvs to names of urls, and remove matching ones
-            if patutil.getUrlFilename(csv, True) == patutil.getUrlFilename(url, True):
+            if patutil.getUrlFilename(csv) == patutil.getUrlFilename(url, True) + '.csv':
                remove.append(url)
 
     #print urls

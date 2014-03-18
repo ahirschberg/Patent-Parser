@@ -65,9 +65,9 @@ class Tags():
             self.ipa_parentcase = 'us-related-documents/parent-doc/document-id/doc-number' # Parent Case
             self.ipa_childcase = 'us-related-documents/child-doc/document-id/doc-number' # Child Case'''
         
-        if year >= 12:
-            # Figure this out
-            self.ipa_inventors = 'us-parties/inventors'
+        if year >= 13:
+            # Figure this out -- is it the same?
+            self.ipa_inventors = 'applicants'
     
     def getAppTags(self, year):
         self.setTags(year)
@@ -132,20 +132,24 @@ def getUrlList(url, sort=True):
 # The parser will not parse past the second dtd statement, so this will split each xml segment into its own file in memory
 def split_xml(fulldoc):
     xml = []
-    lnum = 0
-    n_iter = 0
+    lnum = 1
+    n_iter = 1
     print 'Splitting xml, please wait...'
     
     found = False
     for line in fulldoc:
-        lnum += 1
-        xml.append(line)
-        
         # Try and find where the tag changes so I can patch it in
-        if line.strip().find(formatTag(tags.ipa_enclosing)) >= 0:
+        #if lnum < 20:
+        #    print '%s ?= %s' % (tags.ipa_enclosing, line)
+
+        if line.find(formatTag(tags.ipa_enclosing)[:-1]) >= 0:
             found = True
 
+        if found: # Sometimes there is data outside the ipa_enclosing tags which messes up the parser.
+            xml.append(line)
+
         if (line.strip().find(formatTag(tags.ipa_enclosing, True)) >= 0):
+            found = False
             # Clone the list and append it to xmldocs
             xmldocs.append(list(xml))
             # Write to file (should be commmented out, for debugging purposes
@@ -155,8 +159,10 @@ def split_xml(fulldoc):
             xml = []
             sys.stdout.write("\rSplit %d on line %d ..." % (n_iter, lnum))
             sys.stdout.flush()
-            if n_iter >= 254:
+            if n_iter >= 5590:
                 break
+
+        lnum += 1
             
     print 'Done with length %d.' % len(xmldocs)
 
@@ -184,7 +190,8 @@ def scrape(xmllist):
     else:
         return 
     # Create a string from the singular xml list created in split_xml()
-    xml = '\n'.join(xmllist)
+    xml = ''.join(xmllist)
+    patutil.dump_xml(xml, 'dumped_' + str(xmliteration))
     soup = BeautifulSoup(xml, ["lxml", "xml"])
 
     # List all scraped data will be stored in
@@ -248,7 +255,7 @@ def strfind_tag(starttag, endtag, xmllist):
         if endpos >= 0:
             # Without the enclosing tags, it will only recognize the first tag within the result.
             endresult = '<_enclosing>' + result[len(starttag) : ] + '</_enclosing>'
-            print endresult
+            #print endresult
             return unicode(BeautifulSoup(endresult, ['lxml', 'xml']).find('p').get_text())
     return 'None'
 
