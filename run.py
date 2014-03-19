@@ -58,7 +58,7 @@ def main():
         # Setup csv for writing
         file_writer.setFilename(patutil.getUrlFilename(urls[i], True))
         file_writer.clear_file()
-        file_writer.write_header(patparser.tags.getAppTags(year))
+        file_writer.write_header(patparser.tags.getAppHeadings())
 
         file_writer.write_data(patparser.datalists)
 

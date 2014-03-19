@@ -73,9 +73,9 @@ class CSVFileWriter():
 
         return f
 
-    def write_header(self, tagList):
+    def write_header(self, headings):
         f = self.getCSV()
-        f.write(','.join(tagList))
+        f.write(','.join(headings))
         f.write('\n')
         f.close()
 
@@ -89,14 +89,14 @@ class CSVFileWriter():
 
     def setup_datalist(self, datalist):
         for i in xrange(0, len(datalist)):
-            print 'datalist[%s][1] = %s' % (i, datalist[i]) 
+            #print 'datalist[%s][1] = %s' % (i, datalist[i]) 
             # remove newline characters (need to remove \r as well for some reason)
             data = re.sub('[\r,\n+]', '', datalist[i][1]).strip()
             #data = re.sub(',', '\u0238', data)
-            print self.patparser.tags.ipa_inventors, datalist[i]
+
             # Denote text fields containing commas and spaces with '', unless it is the inventors field
             if data.find(',') >= 0 or (data.find(' ') >= 0 and datalist[i][0] != self.patparser.tags.ipa_inventors):
-                print 'adding quotes to', data
+                #print 'adding quotes to', data
                 data = '\'' + data + '\''
             datalist[i][1] = data
 
