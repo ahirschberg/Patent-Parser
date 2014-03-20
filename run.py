@@ -17,23 +17,36 @@ download_directory = '/temp/'
 
 file_writer = None 
 
-def main():
+def main(ptype=None, filename=None, max_iter=(-1)):
     
-    # Get patent urls from webpage
-    pageurl = 'https://www.google.com/googlebooks/uspto-patents-applications-text.html'
-    print 'Getting webpage', pageurl + '...',
+    if filename != None and ptype == None:
+        if filename[:4] == 'ipa_':
+            ptype = 'a'
+        elif filename[:4] == 'ipg_':
+            ptype = 'g'
+    pageurl = None
+    if ptype == 'a':
+        pageurl = 'https://www.google.com/googlebooks/uspto-patents-applications-text.html'
+    elif ptype == 'g':
+        pageurl = 'https://www.google.com/googlebooks/uspto-patents-grants-text.html'
+        
     urls = []
 
-    # Remove any xml file from earlier than 2007
-    for url in patparser.getUrlList(pageurl):
-        if patutil.splitDate(url, True)[0] >= 7:
-            urls.append(url)
-    urls = ['ipa130103.zip']
+    if filename == None:
+        print 'Getting webpage', str(pageurl) + '...',
+        # Get patent applications and remove any xml file from earlier than 2007
+        for url in patparser.getUrlList(pageurl, ptype):
+            if patutil.splitDate(url, True)[0] >= 7:
+                urls.append(url)
+
+        numremoved = removeParsed(urls, file_writer.getCSVsInDir())
+        print 'Found %d urls (%d removed because they already had CSV files)' % (len(urls), numremoved)
+    else:
+        urls = [filename]
     
-    numremoved = 0# removeParsed(urls, file_writer.getCSVsInDir())
-    print 'Found %d urls (%d removed because they already had CSV files)' % (len(urls), numremoved)
     if not os.path.exists(patutil.getwd() + download_directory):
         os.makedirs(patutil.getwd() + download_directory)
+
     i = 0
     # Iterate through urls from oldest to newest, downloading and parsing each one
     while i < len(urls):
@@ -52,7 +65,7 @@ def main():
         year = patutil.splitDate(urls[i], True)[0] 
         patparser.tags.setTags(year)
         file_writer.setParser(patparser)
-        patparser.split_xml(fulldoc)
+        patparser.split_xml(fulldoc, max_iter)
         patparser.scrape_multi(year)
         
         # Setup csv for writing
@@ -151,28 +164,25 @@ def reporthook(count, block_size, total_size):
     sys.stdout.flush()
 
 
-def safe_exit(signum, frame):
-    # Reset original signal handler
-    signal.signal(signal.SIGINT, original_sigint)
-    
-    if scraping:
-        print 'Program is currently scraping; will exit once done.'
-        global break_scrape
-        break_scrape = True
-    else:
-        # Make Ctrl+C behave normally if not scraping
-        raise KeyboardInterrupt()
-
-
 if __name__ == '__main__':
     start = time.clock()
-
-    # Catch Control + C so that you cannot exit during a scrape
-    #original_sigint = signal.getsignal(signal.SIGINT)
-    #signal.signal(signal.SIGINT, safe_exit)
     
     file_writer = patutil.CSVFileWriter()
+    args = sys.argv
+    
+    ptype = None
+    max_iter = None
+    filename = None if args[1][0] == '-' else args[1]
 
-    main()
+    # Setup flags
+    for i in xrange(0,len(args)):
+        if args[i] == '-g' or args[i] == '-a':
+            ptype = args[i][1:]
+        elif args[i] == '-r':
+            max_iter = int(args[i+1])
+
+    print 'Straight args: %s, ptype %s, max_iter %s, filename %s' % (args, str(ptype), str(max_iter), str(filename))
+    main(ptype=ptype, filename=filename, max_iter=max_iter)
+     
     elapsed = (time.clock() - start)
-    print '\nTime elapsed:', elapsed
+    print '\nTime elapsed: %s seconds' % elapsed

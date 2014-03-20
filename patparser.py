@@ -7,6 +7,7 @@ import time
 import patutil
 
 class Tags():
+    global ptype = None
 
     def setTags(self, year):
 
@@ -89,7 +90,7 @@ class Tags():
                 'child-case']
 
     def getGrantTags(self, year):
-        return self.getTags(year, 'ipg_')
+        return self.getAppTags(year) #temp #self.getTags(year, 'ipg_')
 
     # Get all variables in Tags that start with a prefix and append the values to a list
     def getTags(self, year, prefix):
@@ -114,23 +115,27 @@ file_writer = None
 
 tags = Tags()
 
-def getUrlList(url, sort=True):
+def getUrlList(url, ptype, sort=True):
     response = urllib.urlopen(url)
     soup = BeautifulSoup(response, ["lxml", "html"])
     result = []
+    
     # Google downloading
     for link in soup.find_all('a'):
-        if link.text.strip()[:3] == 'ipa' or link.text.strip()[:2] == 'pa':
+        if link.text.strip()[:3] == ('ip' + ptype) or link.text.strip()[:2] == ('p' + ptype):
             result.append(link.get('href'))
             #print 'Appending %s' % link.get('href')
+
     if sort: result = sorted(result, key=lambda str: re.sub('[^0-9]', '', str))
     return result 
 
+
 # The parser will not parse past the second dtd statement, so this will split each xml segment into its own file in memory
-def split_xml(fulldoc):
+def split_xml(fulldoc, max_iter=(-1)):
     xml = []
     lnum = 1
     n_iter = 1
+    print max_iter
     print 'Splitting xml, please wait...'
     
     found = False
@@ -156,7 +161,7 @@ def split_xml(fulldoc):
             xml = []
             sys.stdout.write("\rSplit %d on line %d ..." % (n_iter, lnum))
             sys.stdout.flush()
-            if n_iter >= 120:
+            if max_iter >= 0 and n_iter > max_iter:
                 break
 
         lnum += 1
