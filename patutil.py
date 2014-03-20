@@ -1,10 +1,14 @@
 import os
 import re
+import sys
 import codecs
+
+print_over_len = None
 
 # Get working directory
 def getwd():
     return os.path.dirname(os.path.realpath(__file__))
+
 
 # Gets the string from the last / character to the end (for example http://patents.reedtech.com/.../ipa140213.zip would return ipa140213.zip
 def getUrlFilename(url, remftype=False):
@@ -30,6 +34,16 @@ def splitDate(url, makeint=False):
     return datearr
 
 
+def print_over(string):
+    if print_over_len >= 0:
+        sys.stdout.write('\r' + ' ' * print_over_len)
+    sys.stdout.write(string)
+    sys.stdout.flush()
+    
+    global print_over_len
+    print_over_len = len(string)
+
+
 # Debug method to dump split xml documents
 def dump_xml(xml, name):
     if not os.path.exists(getwd() + '/dump/'):
@@ -44,7 +58,9 @@ def dump_xml(xml, name):
 class CSVFileWriter():
 
     datalist = []
-    output_directory = '/output/'
+    output_directory_a = '/output_app/'
+    output_directory_p = '/output_grant/'
+    output_directory = '/output/' # TODO
 
     def setFilename(self, filename):
         print 'Setting filename to %s' % filename

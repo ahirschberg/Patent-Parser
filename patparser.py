@@ -6,8 +6,10 @@ import time
 
 import patutil
 
-class Tags():
-    global ptype = None
+class Tags:
+
+    def __init__(self):
+        self.ptype = None
 
     def setTags(self, year):
 
@@ -24,6 +26,7 @@ class Tags():
             self.ipa_pct_pubnum = 'foreign-priority-data/priority-application-number/doc-number', # PCT Application number
             self.ipa_govint = 'subdoc-description/federal-research-statement/paragraph-federal-research-statement', # Government Interest? - Paragraph acknowledging NSF
             self.ipa_parentcase = 'continuity-data/division-of' # Parent Case - cases in <parent-child/? 
+
 
         if year >= 07:
             # 2007 tagslist
@@ -45,6 +48,8 @@ class Tags():
             self.ipa_govint = '<?federal-research-statement description="Federal Research Statement" end="lead"?><?federal-research-statement description="Federal Research Statement" end="tail"?>' #Govt interest?
             self.ipa_parentcase = 'us-related-documents/parent-doc/document-id/doc-number' # Parent Case
             self.ipa_childcase = 'us-related-documents/child-doc/document-id/doc-number' # Child Case
+
+            self.ipg_enclosing = 'us-patent-grant'
 
         if year >= 12:
             self.ipa_inventors = 'us-applicants'
@@ -90,20 +95,17 @@ class Tags():
                 'child-case']
 
     def getGrantTags(self, year):
-        return self.getAppTags(year) #temp #self.getTags(year, 'ipg_')
+        return self.getTags(year, 'ipg_')
 
-    # Get all variables in Tags that start with a prefix and append the values to a list
-    def getTags(self, year, prefix):
-        self.setTags(year)
-        
-        tagsList = []
-        for var in iter(self.__dict__):
-             #print b
-             if var[:len(prefix)] == prefix:
-                 tagsList.append(self.__dict__.get(var))
+    def getTags(self, year):
+        return self.getAppTags(year)
 
-        return tagsList
-        
+    # Convenience method to get the enclosing tag for whichever mode is being used
+    def getEnclosing(self):
+        if tags.ptype == 'a': return tags.ipa_enclosing
+        elif tags.ptype == 'g': return tags.ipg_enclosing 
+        else: return None
+
 
 xmldocs = [] # split_xml saves the split xml lists here 
 xmliteration = 0 # Progression through xmldocs
@@ -140,17 +142,14 @@ def split_xml(fulldoc, max_iter=(-1)):
     
     found = False
     for line in fulldoc:
-        # Try and find where the tag changes so I can patch it in
-        #if lnum < 20:
-        #    print '%s ?= %s' % (tags.ipa_enclosing, line)
-
-        if line.find(formatTag(tags.ipa_enclosing)[:-1]) >= 0:
+        enclosing = tags.getEnclosing()
+        if line.find(formatTag(enclosing)[:-1]) >= 0:
             found = True
 
         if found: # Sometimes there is data outside the ipa_enclosing tags which messes up the parser.
             xml.append(line)
 
-        if (line.strip().find(formatTag(tags.ipa_enclosing, True)) >= 0):
+        if (line.strip().find(formatTag(enclosing, True)) >= 0):
             found = False
             # Clone the list and append it to xmldocs
             xmldocs.append(list(xml))
@@ -159,8 +158,7 @@ def split_xml(fulldoc, max_iter=(-1)):
             #f.write(''.join(xml))
             n_iter += 1
             xml = []
-            sys.stdout.write("\rSplit %d on line %d ..." % (n_iter, lnum))
-            sys.stdout.flush()
+            patutil.print_over("\rSplit %d on line %d ..." % (n_iter, lnum))
             if max_iter >= 0 and n_iter > max_iter:
                 break
 
@@ -168,13 +166,13 @@ def split_xml(fulldoc, max_iter=(-1)):
             
     print 'Done with length %d.' % len(xmldocs)
 
-def scrape_multi(year_):
+def scrape_multi(year_, nonsf_flag=False):
     global year
     year = year_
 
     for xml in xmldocs:
         #Add data to datalist
-        data = scrape(xml)
+        data = scrape(xml, nonsf_flag)
         datalists.append(data)
         global xmliteration
         xmliteration += 1
@@ -182,26 +180,25 @@ def scrape_multi(year_):
     print ''
 
 
-def scrape(xmllist):
-    sys.stdout.write("\rScraping %s of %s." % (xmliteration + 1, len(xmldocs)))
-    sys.stdout.flush()
+def scrape(xmllist, nonsf_flag=False):
+    patutil.print_over("\rScraping %s of %s." % (xmliteration + 1, len(xmldocs)))
     
     # Gets the government interest field and looks for NSF or national science foundation
     if (get_govt_interest(xmllist)):
         print 'Found NSF reference, adding to CSV. <!!!!!!!!!!!'
-    else:
+    elif not nonsf_flag:
         return 
     # Create a string from the singular xml list created in split_xml()
     xml = ''.join(xmllist)
     # Debug method which dumps split xml into separate files
-    #patutil.dump_xml(xml, 'dumped_' + str(xmliteration))
+    patutil.dump_xml(xml, 'dumped_' + str(xmliteration))
     soup = BeautifulSoup(xml, ["lxml", "xml"])
 
     # List all scraped data will be stored in
     datalist = []
 
     global tags
-    for tag in tags.getAppTags(year):
+    for tag in tags.getTags(year):
         # Non bs4 parsing
         if (tag[0:2] == '<?'):
             # Split start and end tags
@@ -267,12 +264,11 @@ def parse_xml(soup, tag):
     global tags
     finaltag = None #The tag object which will be printed or returned at the end of the scrape
     result = 'None'
-    sys.stdout.write("\rScraping tag %s.                             " % (tag))
-    sys.stdout.flush()
+    patutil.print_over('\rScraping tag %s.' % (tag))
      
     # (Re)sets subsoup to the top of the xml tree
-    #print tags
-    subsoup = soup.find(tags.ipa_enclosing)
+    enclosing = tags.getEnclosing() 
+    subsoup = soup.find(enclosing)
     tagtree = tag.split('/')
     #print 'tagtree length:', len(tagtree)
     for i in xrange(0, len(tagtree)):

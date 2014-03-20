@@ -9,16 +9,13 @@ import zipfile
 import patutil
 import patparser
 
-# For safely exiting after a scrape, not during it
-scraping = False
-break_scrape = False
-
 download_directory = '/temp/'
-
 file_writer = None 
+cmd_args = {'ptype' : None, 'filename' : None, 'max_iter' : -1, 'no_nsf_flag' : False, 'single_doc_flag' : False}
 
-def main(ptype=None, filename=None, max_iter=(-1)):
-    
+def main():
+    filename = cmd_args['filename'] 
+    ptype = cmd_args['ptype']
     if filename != None and ptype == None:
         if filename[:4] == 'ipa_':
             ptype = 'a'
@@ -63,10 +60,11 @@ def main(ptype=None, filename=None, max_iter=(-1)):
         
         # Split and scrape xml
         year = patutil.splitDate(urls[i], True)[0] 
+        patparser.tags.ptype = ptype
         patparser.tags.setTags(year)
         file_writer.setParser(patparser)
-        patparser.split_xml(fulldoc, max_iter)
-        patparser.scrape_multi(year)
+        patparser.split_xml(fulldoc, cmd_args['max_iter'])
+        patparser.scrape_multi(year, cmd_args['no_nsf_flag'])
         
         # Setup csv for writing
         file_writer.setFilename(patutil.getUrlFilename(urls[i], True))
@@ -76,8 +74,8 @@ def main(ptype=None, filename=None, max_iter=(-1)):
         file_writer.write_data(patparser.datalists)
 
         i+= 1
-        # DB - For debugging, break at a certain point
-        break 
+        if cmd_args['single_doc_flag']:
+            break 
 
 # Get zip file and unzip, setting fulldoc to a value
 def get_xml(pageurl, url, forcedl=False):
@@ -160,8 +158,7 @@ def reporthook(count, block_size, total_size):
     progress_size = (count * block_size)
     speed = int(progress_size / (1024 * duration))
     percent = int(count * block_size * 100 / total_size)
-    sys.stdout.write("\rProgress: %d%%, %.2f %.2f MB, %d KB/s, %d seconds passed" % (percent, float(progress_size) / (1024 * 1024), float(total_size) / (1024 * 1024), speed, duration))
-    sys.stdout.flush()
+    patutil.print_over("\rProgress: %d%%, %.2f %.2f MB, %d KB/s, %d seconds passed" % (percent, float(progress_size) / (1024 * 1024), float(total_size) / (1024 * 1024), speed, duration))
 
 
 if __name__ == '__main__':
@@ -170,19 +167,21 @@ if __name__ == '__main__':
     file_writer = patutil.CSVFileWriter()
     args = sys.argv
     
-    ptype = None
-    max_iter = None
-    filename = None if args[1][0] == '-' else args[1]
+    cmd_args['filename'] = None if args[1][0] == '-' else args[1]
 
     # Setup flags
     for i in xrange(0,len(args)):
-        if args[i] == '-g' or args[i] == '-a':
-            ptype = args[i][1:]
-        elif args[i] == '-r':
-            max_iter = int(args[i+1])
+        if args[i] == '-g' or args[i] == '-a': # Get whether to find patent grants or applications
+            cmd_args['ptype'] = args[i][1:]
+        elif args[i] == '-max': # Set a max number to split (useful for debug)
+            cmd_args['max_iter'] = int(args[i+1])
+        elif args[i] == '-nonsf': # Find all data, not just nsf
+            cmd_args['no_nsf_flag'] = True
+        elif args[i] == '-single': # Prevents downloading and/or parsing of more than one xml file
+            cmd_args['single_doc_flag'] = True
 
-    print 'Straight args: %s, ptype %s, max_iter %s, filename %s' % (args, str(ptype), str(max_iter), str(filename))
-    main(ptype=ptype, filename=filename, max_iter=max_iter)
+    print 'Straight args: %s, ptype %s, max_iter %s, filename %s, nonsf %s, single_doc %s' % (args, cmd_args['ptype'], str(cmd_args['max_iter']), str(cmd_args['filename']), str(cmd_args['no_nsf_flag']), str(cmd_args['single_doc_flag']))
+    main()
      
     elapsed = (time.clock() - start)
     print '\nTime elapsed: %s seconds' % elapsed
