@@ -31,18 +31,17 @@ class Tags:
         if year >= 07:
             # 2007 tagslist
             self.ipa_enclosing = 'us-patent-application'
+            self.ipa_pubnum = 'publication-reference/document-id/doc-number'
             self.ipa_pubdate = 'publication-reference/document-id/date' #Published patent document
             self.ipa_invtitle = 'invention-title' #Title of invention
             self.ipa_abstract = 'abstract/p' # Concise summary of disclosure
+            self.ipa_assignee = 'asignees/assignee'
             self.ipa_inventors = 'applicants' # Applicants information
             self.ipa_crossref = '<?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="lead"?><?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="tail"?>' #
             self.ipa_appnum = 'application-reference/document-id/doc-number' # Patent ID
-            self.ipa_appdate = 'application-reference/document-id/date' # Patent ID Date or something
-            self.ipa_pct_filedate = 'pct-or-regional-filing-data/document-id/date' #
-            self.ipa_pct_filenum = 'pct-or-regional-filing-data/document-id/doc-number' #PCT filing number
+            self.ipa_appdate = 'application-reference/document-id/date' # Filing Date
             self.ipa_pct_371cdate = 'pct-or-regional-filing-data/us-371c124-date' # PCT filing date
             self.ipa_pct_pubnum = 'pct-or-regional-publishing-data/document-id/doc-number' # PCT publishing date
-            self.ipa_pct_pubdate = 'pct-or-regional-publishing-data/document-id/date' # PCT publishing date
             self.ipa_priorpub = 'related-publication/document-id/doc-number' # Previously published document about same app
             self.ipa_priorpubdate = 'related-publication/document-id/date' # Date for previously published document
             self.ipa_govint = '<?federal-research-statement description="Federal Research Statement" end="lead"?><?federal-research-statement description="Federal Research Statement" end="tail"?>' #Govt interest?
@@ -50,60 +49,74 @@ class Tags:
             self.ipa_childcase = 'us-related-documents/child-doc/document-id/doc-number' # Child Case
 
             self.ipg_enclosing = 'us-patent-grant'
+            self.ipg_govint = '<?GOVINT description="Government Interest" end="lead"?><?GOVINT description="Government Interest" end="tail"?>'
+            self.ipg_crossref = '<?RELAPP description="Other Patent Relations" end="lead"?><?RELAPP description="Other Patent Relations" end="tail"?>'
 
         if year >= 12:
             self.ipa_inventors = 'us-applicants'
         
-        if year >= 13:
-            # Figure this out -- is it the same?
-            self.ipa_inventors = 'applicants'
-    
     def getAppTags(self, year):
         self.setTags(year)
 
-        return [self.ipa_pubdate,
+        return [self.ipa_appnum,
+                self.ipa_pubdate,
+                self.ipa_pubnum,
                 self.ipa_invtitle,
                 self.ipa_abstract,
                 self.ipa_inventors,
+                self.ipa_assignee,
                 self.ipa_crossref,
-                self.ipa_appnum,
-                self.ipa_appdate,
-                #self.ipa_pct_filedate,
-                #self.ipa_pct_filenum,
-                self.ipa_pct_371cdate,
-                self.ipa_pct_pubnum,
-                #self.ipa_pct_pubdate,
-                #self.ipa_priorpub,
-                #self.ipa_priorpubdate,
+                self.ipa_appdate, # File date
                 self.ipa_govint,
                 self.ipa_parentcase,
-                self.ipa_childcase]
-        #return self.getTags(year, 'ipa_')
-    
-    def getAppHeadings(self):
-        return ['publication-date',
-                'invention-title',
+                self.ipa_childcase,
+                self.ipa_pct_371cdate,
+                self.ipa_pct_pubnum]
+  
+   
+    def getHeadings(self):
+        return ['appnum',
+                'pubdate',
+                'pubnum',
+                'invtitle',
                 'abstract',
                 'inventors',
-                'cross-reference',
-                'application-number',
-                'application-date',
-                'pct-371-date',
-                'pct-publication-number',
-                'government-interest',
-                'parent-case',
-                'child-case']
+                'assignee',
+                'crossref',
+                'appdate', # File date
+                'govint',
+                'parentcase',
+                'childcase',
+                'pct_371cdate',
+                'pct_pubnum']
 
+    # Grant tags that are equivalent to application tags are not duplicated.
     def getGrantTags(self, year):
-        return self.getTags(year, 'ipg_')
+        return [self.ipa_appnum,
+                self.ipa_pubdate,
+                self.ipa_pubnum,
+                self.ipa_invtitle,
+                self.ipa_abstract,
+                self.ipa_inventors,
+                self.ipa_assignee,
+                self.ipg_crossref,
+                self.ipa_appdate, # File date
+                self.ipg_govint,
+                self.ipa_parentcase,
+                self.ipa_childcase,
+                self.ipa_pct_371cdate,
+                self.ipa_pct_pubnum]
 
     def getTags(self, year):
-        return self.getAppTags(year)
+        if patutil.cmd_args['ptype'] == 'a':
+            return self.getAppTags(year)
+        elif patutil.cmd_args['ptype'] == 'g':
+            return self.getGrantTags(year)
 
     # Convenience method to get the enclosing tag for whichever mode is being used
     def getEnclosing(self):
-        if tags.ptype == 'a': return tags.ipa_enclosing
-        elif tags.ptype == 'g': return tags.ipg_enclosing 
+        if patutil.cmd_args['ptype'] == 'a': return tags.ipa_enclosing
+        elif patutil.cmd_args['ptype'] == 'g': return tags.ipg_enclosing 
         else: return None
 
 
@@ -191,7 +204,8 @@ def scrape(xmllist, nonsf_flag=False):
     # Create a string from the singular xml list created in split_xml()
     xml = ''.join(xmllist)
     # Debug method which dumps split xml into separate files
-    patutil.dump_xml(xml, 'dumped_' + str(xmliteration))
+    if patutil.cmd_args['dump_flag']:
+        patutil.dump_xml(xml, 'dumped_' + str(xmliteration))
     soup = BeautifulSoup(xml, ["lxml", "xml"])
 
     # List all scraped data will be stored in
@@ -213,7 +227,16 @@ def scrape(xmllist, nonsf_flag=False):
 
 
 def get_govt_interest(xmllist):
-    standardline = strfind_tag('<?federal-research-statement description="Federal Research Statement" end="lead"?>','<?federal-research-statement description="Federal Research Statement" end="tail"?>', xmllist)
+    govint_pair = None
+    # This could be consolidated into one set of string manipulations.
+    if patutil.cmd_args['ptype'] == 'a':
+        split = tags.ipa_govint.find('>') + 1
+        govint_pair = (tags.ipa_govint[0:split], tags.ipa_govint[split:])
+    elif patutil.cmd_args['ptype'] == 'g':
+        split = tags.ipg_govint.find('>') + 1
+        govint_pair = (tags.ipg_govint[0:split], tags.ipg_govint[split:])
+
+    standardline = strfind_tag(govint_pair[0], govint_pair[1], xmllist)
     
     #print 'Final text',standardline
     if standardline == None:

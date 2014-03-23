@@ -11,17 +11,12 @@ import patparser
 
 download_directory = '/temp/'
 file_writer = None 
-cmd_args = {'ptype' : None, 'filename' : None, 'max_iter' : -1, 'no_nsf_flag' : False, 'single_doc_flag' : False}
 
 def main():
-    filename = cmd_args['filename'] 
-    ptype = cmd_args['ptype']
-    if filename != None and ptype == None:
-        if filename[:4] == 'ipa_':
-            ptype = 'a'
-        elif filename[:4] == 'ipg_':
-            ptype = 'g'
+    filename = patutil.cmd_args['filename'] 
+    ptype = patutil.cmd_args['ptype']
     pageurl = None
+
     if ptype == 'a':
         pageurl = 'https://www.google.com/googlebooks/uspto-patents-applications-text.html'
     elif ptype == 'g':
@@ -60,21 +55,20 @@ def main():
         
         # Split and scrape xml
         year = patutil.splitDate(urls[i], True)[0] 
-        patparser.tags.ptype = ptype
         patparser.tags.setTags(year)
         file_writer.setParser(patparser)
-        patparser.split_xml(fulldoc, cmd_args['max_iter'])
-        patparser.scrape_multi(year, cmd_args['no_nsf_flag'])
+        patparser.split_xml(fulldoc, patutil.cmd_args['max_iter'])
+        patparser.scrape_multi(year, patutil.cmd_args['no_nsf_flag'])
         
         # Setup csv for writing
         file_writer.setFilename(patutil.getUrlFilename(urls[i], True))
         file_writer.clear_file()
-        file_writer.write_header(patparser.tags.getAppHeadings())
+        file_writer.write_header(patparser.tags.getHeadings())
 
         file_writer.write_data(patparser.datalists)
 
         i+= 1
-        if cmd_args['single_doc_flag']:
+        if patutil.cmd_args['single_doc_flag']:
             break 
 
 # Get zip file and unzip, setting fulldoc to a value
@@ -164,23 +158,33 @@ def reporthook(count, block_size, total_size):
 if __name__ == '__main__':
     start = time.clock()
     
-    file_writer = patutil.CSVFileWriter()
     args = sys.argv
     
-    cmd_args['filename'] = None if args[1][0] == '-' else args[1]
+    patutil.cmd_args['filename'] = None if args[1][0] == '-' else args[1]
 
     # Setup flags
     for i in xrange(0,len(args)):
         if args[i] == '-g' or args[i] == '-a': # Get whether to find patent grants or applications
-            cmd_args['ptype'] = args[i][1:]
+            patutil.cmd_args['ptype'] = args[i][1:]
         elif args[i] == '-max': # Set a max number to split (useful for debug)
-            cmd_args['max_iter'] = int(args[i+1])
+            patutil.cmd_args['max_iter'] = int(args[i+1])
         elif args[i] == '-nonsf': # Find all data, not just nsf
-            cmd_args['no_nsf_flag'] = True
+            patutil.cmd_args['no_nsf_flag'] = True
         elif args[i] == '-single': # Prevents downloading and/or parsing of more than one xml file
-            cmd_args['single_doc_flag'] = True
+            patutil.cmd_args['single_doc_flag'] = True
+        elif args[i] == '-dump':
+            patutil.cmd_args['dump_flag'] = True
 
-    print 'Straight args: %s, ptype %s, max_iter %s, filename %s, nonsf %s, single_doc %s' % (args, cmd_args['ptype'], str(cmd_args['max_iter']), str(cmd_args['filename']), str(cmd_args['no_nsf_flag']), str(cmd_args['single_doc_flag']))
+    print 'Straight args: %s, ptype %s, max_iter %s, filename %s, nonsf %s, single_doc %s' % (args, patutil.cmd_args['ptype'], str(patutil.cmd_args['max_iter']), str(patutil.cmd_args['filename']), str(patutil.cmd_args['no_nsf_flag']), str(patutil.cmd_args['single_doc_flag']))
+
+    filename = patutil.cmd_args['filename']
+    if filename != None and patutil.cmd_args['ptype'] == None:
+        if filename[:3] == 'ipa':
+            patutil.cmd_args['ptype'] = 'a'
+        elif filename[:3] == 'ipg':
+            patutil.cmd_args['ptype'] = 'g'
+
+    file_writer = patutil.CSVFileWriter()
     main()
      
     elapsed = (time.clock() - start)

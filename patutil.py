@@ -4,6 +4,7 @@ import sys
 import codecs
 
 print_over_len = None
+cmd_args = {'ptype' : None, 'filename' : None, 'max_iter' : -1, 'no_nsf_flag' : False, 'single_doc_flag' : False, 'dump_flag' : True}
 
 # Get working directory
 def getwd():
@@ -55,36 +56,49 @@ def dump_xml(xml, name):
     f.close()
 
 
-class CSVFileWriter():
+class CSVFileWriter:
 
     datalist = []
     output_directory_a = '/output_app/'
-    output_directory_p = '/output_grant/'
-    output_directory = '/output/' # TODO
+    output_directory_g = '/output_grant/'
+    output_directory = None
 
+    def __init__(self):
+        self.setOutputDir()
+
+    def setOutputDir(self):
+        if cmd_args['ptype'] == 'g': self.output_directory = self.output_directory_g 
+        elif cmd_args['ptype'] == 'a': self.output_directory = self.output_directory_a 
+    
     def setFilename(self, filename):
         print 'Setting filename to %s' % filename
         self.filename = filename
 
-
     def setParser(self, patparser):
         self.patparser = patparser
-
     
     def getCSVsInDir(self):
+
+        self.checkOutputDir()
         return [f for f in os.listdir(getwd() + self.output_directory[:-1])]
 
+    def checkOutputDir(self):
+
+        if not os.path.exists(getwd() + self.output_directory):
+            os.makedirs(getwd() + self.output_directory)
 
     def getCSV(self, mode='w'):
         # Create output directory
-        if not os.path.exists(getwd() + self.output_directory):
-            os.makedirs(getwd() + self.output_directory)
+        self.checkOutputDir()
 
         if self.filename == None:
             self.filename = 'output.csv'
 
         if self.filename[-4:] != '.csv':
             self.filename = self.filename + '.csv'
+
+        if cmd_args['max_iter'] >= 0 and self.filename[:4] != 'inc_':
+            self.filename = 'inc_' + self.filename
         f = codecs.open(getwd() + self.output_directory + self.filename, mode, 'utf-8-sig')
 
         return f
@@ -111,7 +125,12 @@ class CSVFileWriter():
             #data = re.sub(',', '\u0238', data)
 
             # Denote text fields containing commas and spaces with '', unless it is the inventors field
-            if data.find(',') >= 0 or (data.find(' ') >= 0 and datalist[i][0] != self.patparser.tags.ipa_inventors):
+            inventors_field = None
+            if cmd_args['ptype'] == 'a':
+                inventors_field = self.patparser.tags.ipa_inventors
+            elif cmd_args['ptype'] == 'g':
+                inventors_field = self.patparser.tags.ipa_inventors # TODO?
+            if data.find(',') >= 0 or (data.find(' ') >= 0 and datalist[i][0] != inventors_field):
                 #print 'adding quotes to', data
                 data = '\'' + data + '\''
             datalist[i][1] = data
