@@ -12,22 +12,6 @@ class Tags:
         self.ptype = None
 
     def setTags(self, year):
-
-        if year >= 0: # These tags will probably not work correctly.  The program is only designed for 2007 DTD standard and above 
-            self.ipa_enclosing = 'patent-application-publication', # Enclosing tags
-            self.ipa_pubdate = 'document-id/document-date', # Date (published?)
-            self.ipa_invtitle = 'title-of-invention', # Title of invention
-            self.ipa_abstract = 'subdoc-abstract/paragraph', # Abstract
-            self.ipa_inventors = 'inventors', # List of inventors
-            self.ipa_crossref = 'subdoc-description/cross-reference-to-related-applications/paragraph', # Cross reference to related applications
-            self.ipa_appnum = 'domestic-filing-data/application-number/doc-number', # Id number
-            self.ipa_appdate = 'domestic-filing-data/filing-date', # US Date filed
-            self.ipa_pct_filedate = 'foreign-priority-data/filing-date', # PCT Filing Date
-            self.ipa_pct_pubnum = 'foreign-priority-data/priority-application-number/doc-number', # PCT Application number
-            self.ipa_govint = 'subdoc-description/federal-research-statement/paragraph-federal-research-statement', # Government Interest? - Paragraph acknowledging NSF
-            self.ipa_parentcase = 'continuity-data/division-of' # Parent Case - cases in <parent-child/? 
-
-
         if year >= 07:
             # 2007 tagslist
             self.ipa_enclosing = 'us-patent-application'
@@ -35,16 +19,16 @@ class Tags:
             self.ipa_pubdate = 'publication-reference/document-id/date' #Published patent document
             self.ipa_invtitle = 'invention-title' #Title of invention
             self.ipa_abstract = 'abstract/p' # Concise summary of disclosure
-            self.ipa_assignee = 'asignees/assignee'
+            self.ipa_assignee = 'assignees/assignee'
             self.ipa_inventors = 'applicants' # Applicants information
-            self.ipa_crossref = '<?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="lead"?><?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="tail"?>' #
+            self.ipa_crossref = '<?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="lead"?><?cross-reference-to-related-applications description="Cross Reference To Related Applications" end="tail"?>' # Xref, but there is also a 2nd option coded into the scrape method
             self.ipa_appnum = 'application-reference/document-id/doc-number' # Patent ID
             self.ipa_appdate = 'application-reference/document-id/date' # Filing Date
             self.ipa_pct_371cdate = 'pct-or-regional-filing-data/us-371c124-date' # PCT filing date
             self.ipa_pct_pubnum = 'pct-or-regional-publishing-data/document-id/doc-number' # PCT publishing date
             self.ipa_priorpub = 'related-publication/document-id/doc-number' # Previously published document about same app
             self.ipa_priorpubdate = 'related-publication/document-id/date' # Date for previously published document
-            self.ipa_govint = '<?federal-research-statement description="Federal Research Statement" end="lead"?><?federal-research-statement description="Federal Research Statement" end="tail"?>' #Govt interest?
+            self.ipa_govint = '<?federal-research-statement description="Federal Research Statement" end="lead"?><?federal-research-statement description="Federal Research Statement" end="tail"?>' #Govint
             self.ipa_parentcase = 'us-related-documents/parent-doc/document-id/doc-number' # Parent Case
             self.ipa_childcase = 'us-related-documents/child-doc/document-id/doc-number' # Child Case
 
@@ -201,14 +185,14 @@ def scrape(xmllist, nonsf_flag=False):
         print 'Found NSF reference, adding to CSV. <!!!!!!!!!!!'
     elif not nonsf_flag:
         return 
-    # Create a string from the singular xml list created in split_xml()
     xml = ''.join(xmllist)
-    # Debug method which dumps split xml into separate files
+
+    # Create a string from the singular xml list created in split_xml()
     if patutil.cmd_args['dump_flag']:
         patutil.dump_xml(xml, 'dumped_' + str(xmliteration))
-    soup = BeautifulSoup(xml, ["lxml", "xml"])
 
-    # List all scraped data will be stored in
+    # Begin the parse
+    soup = BeautifulSoup(xml, ["lxml", "xml"])
     datalist = []
 
     global tags
@@ -218,8 +202,16 @@ def scrape(xmllist, nonsf_flag=False):
             # Split start and end tags
             split = tag.find('>') + 1
             tagpair = (tag[0:split], tag[split:])
-            #print tags
-            datalist.append([tag, strfind_tag(tagpair[0], tagpair[1], xmllist)])
+            strfind_result = strfind_tag(tagpair[0], tagpair[1], xmllist)
+
+            # Hack for alternate way to get cross reference in patent grants in the description element
+            if not (tag == tags.ipg_crossref and strfind_result == None):
+                datalist.append([tag, strfind_result])
+            else:
+                # TODO does this even work?
+                desc = soup.find('description').find('heading').string
+                if re.sub('[^a-z]', '', desc).find('CROSSREF') >= 0:
+                    datalist.append([tag, desc])
         else:
             datalist.append([tag, parse_xml(soup, tag)])
 
@@ -307,6 +299,7 @@ def parse_xml(soup, tag):
             finaltag = subsoup.find(tagtree[i])
             result = tagString(finaltag)
 
+            # Below methods assume that the ipa and ipg variables being worked with are the same
             # Add special formatting for inventors tag
             if tag == tags.ipa_inventors:
                 templist = []
@@ -314,27 +307,25 @@ def parse_xml(soup, tag):
                     for name in finaltag.find_all('addressbook'):
                         #print name
                         templist.append('[')
-                        i = 0
                         # Only append if tag contains name (first-name), (last-name), etc.
-                        # Iterative
-                        '''for namepart in name.children:
-                            if str(type(namepart)) == '<class \'bs4.element.Tag\'>' and namepart.name.find('name') >= 0:
-                                print namepart, str(type(namepart))
-                                # Append all strings
-                                if i > 0:
-                                    templist.append(' ')
-                                print 'Appending' + namepart.string
-                                templist.append(namepart.string.strip())
-                                i += 1'''
-                        # Hard coded
                         templist.append(name.find('first-name').string)
                         if (name.find('middle-name') != None):
                             templist.append(' ' + name.find('middle-name').string)
                         templist.append(' ' + name.find('last-name').string)
-                            
                         templist.append(']')
                 
                     result = ''.join(templist)
+            elif tag == tags.ipa_assignee:
+                templist = []
+                if finaltag != None:
+                    for name in finaltag.find_all('addressbook'):
+                        #print name
+                        templist.append('[')
+                        templist.append(name.find('orgname').string)
+                        templist.append(']')
+                
+                    result = ''.join(templist)
+
 
     #print type(result), result
     return unicode(result)

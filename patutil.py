@@ -126,11 +126,15 @@ class CSVFileWriter:
 
             # Denote text fields containing commas and spaces with '', unless it is the inventors field
             inventors_field = None
+            assignee_field = None
             if cmd_args['ptype'] == 'a':
                 inventors_field = self.patparser.tags.ipa_inventors
+                assignee_field = self.patparser.tags.ipa_assignee
             elif cmd_args['ptype'] == 'g':
                 inventors_field = self.patparser.tags.ipa_inventors # TODO?
-            if data.find(',') >= 0 or (data.find(' ') >= 0 and datalist[i][0] != inventors_field):
+                assignee_field = self.patparser.tags.ipa_assignee
+
+            if data.find(',') >= 0 or (data.find(' ') >= 0 and datalist[i][0] != inventors_field and datalist[i][0] != assignee_field):
                 #print 'adding quotes to', data
                 data = '\'' + data + '\''
             datalist[i][1] = data
