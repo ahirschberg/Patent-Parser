@@ -12,6 +12,7 @@ class Tags:
         self.ptype = None
 
     def setTags(self, year):
+        print 'Year is %s' % year
         if year >= 07:
             # 2007 tagslist
             self.ipa_enclosing = 'us-patent-application'
@@ -84,7 +85,7 @@ class Tags:
                 self.ipa_inventors,
                 self.ipa_assignee,
                 self.ipg_crossref,
-                self.ipa_appdate, # File date
+                self.ipa_appdate, # File date (not sure if interpreting ruby parser's xpath correctly.)
                 self.ipg_govint,
                 self.ipa_parentcase,
                 self.ipa_childcase,
@@ -168,9 +169,12 @@ def scrape_multi(year_, nonsf_flag=False):
     year = year_
 
     for xml in xmldocs:
+        if patutil.cmd_args['max_nsf'] >= 0 and patutil.cmd_args['max_nsf'] <= len(datalists):
+            break
         #Add data to datalist
         data = scrape(xml, nonsf_flag)
-        datalists.append(data)
+        if data != None:
+            datalists.append(data)
         global xmliteration
         xmliteration += 1
     # Add line return to output
@@ -189,7 +193,7 @@ def scrape(xmllist, nonsf_flag=False):
 
     # Create a string from the singular xml list created in split_xml()
     if patutil.cmd_args['dump_flag']:
-        patutil.dump_xml(xml, 'dumped_' + str(xmliteration))
+        patutil.dump_xml(xml, str(xmliteration) + '.xml')
 
     # Begin the parse
     soup = BeautifulSoup(xml, ["lxml", "xml"])
@@ -204,14 +208,16 @@ def scrape(xmllist, nonsf_flag=False):
             tagpair = (tag[0:split], tag[split:])
             strfind_result = strfind_tag(tagpair[0], tagpair[1], xmllist)
 
-            # Hack for alternate way to get cross reference in patent grants in the description element
-            if not (tag == tags.ipg_crossref and strfind_result == None):
+            # Hack for alternate way to get cross reference in patent grants in the description element (not sure if interpreting ruby parser's xpath correctly.)
+            if tag != tags.ipg_crossref or (tag == tags.ipg_crossref and strfind_result != None):
                 datalist.append([tag, strfind_result])
             else:
-                # TODO does this even work?
-                desc = soup.find('description').find('heading').string
-                if re.sub('[^a-z]', '', desc).find('CROSSREF') >= 0:
-                    datalist.append([tag, desc])
+                desc = soup.find('description')
+                if re.sub('[^a-z]', '', desc.find('heading').string.lower()).find('crossref') >= 0:
+                    text = desc.string
+                    print text
+                    datalist.append([tag, text])
+                else: datalist.append([tag, 'None'])
         else:
             datalist.append([tag, parse_xml(soup, tag)])
 
@@ -279,8 +285,8 @@ def parse_xml(soup, tag):
     global tags
     finaltag = None #The tag object which will be printed or returned at the end of the scrape
     result = 'None'
-    patutil.print_over('\rScraping tag %s.' % (tag))
-     
+    #patutil.print_over('\rScraping tag %s.' % (tag))
+    print 'Scraping tag %s.' % tag 
     # (Re)sets subsoup to the top of the xml tree
     enclosing = tags.getEnclosing() 
     subsoup = soup.find(enclosing)
@@ -302,6 +308,7 @@ def parse_xml(soup, tag):
             # Below methods assume that the ipa and ipg variables being worked with are the same
             # Add special formatting for inventors tag
             if tag == tags.ipa_inventors:
+                print 'Tag was inventors'
                 templist = []
                 if finaltag != None:
                     for name in finaltag.find_all('addressbook'):
@@ -325,8 +332,6 @@ def parse_xml(soup, tag):
                         templist.append(']')
                 
                     result = ''.join(templist)
-
-
     #print type(result), result
     return unicode(result)
 

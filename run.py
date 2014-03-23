@@ -47,12 +47,18 @@ def main():
         # Reset xmliteration to 0
         patparser.xmliteration = 0
         fulldoc = ''
-        try:
-            fulldoc = get_xml(pageurl, urls[i])
-        except zipfile.BadZipfile:
-            print 'Found bad zip file, attempting to redownload'
-            fulldoc = get_xml(pageurl, urls[i], True)
-        
+        # Ugly way to get single files to work, assumes urls has one element which is the filename
+        if filename == None:
+            try:
+                fulldoc = get_xml(pageurl, urls[i])
+            except zipfile.BadZipfile:
+                print 'Found bad zip file, attempting to redownload'
+                fulldoc = get_xml(pageurl, urls[i], True)
+        else:
+            if urls[i][-4:] == '.xml':
+                fulldoc = open(patutil.getwd() + urls[i])
+            else: print 'Not a top priority, will do later.' # TODO
+
         # Split and scrape xml
         year = patutil.splitDate(urls[i], True)[0] 
         patparser.tags.setTags(year)
@@ -166,8 +172,10 @@ if __name__ == '__main__':
     for i in xrange(0,len(args)):
         if args[i] == '-g' or args[i] == '-a': # Get whether to find patent grants or applications
             patutil.cmd_args['ptype'] = args[i][1:]
-        elif args[i] == '-max': # Set a max number to split (useful for debug)
+        elif args[i] == '-maxsplit': # Set a max number to split (useful for debug)
             patutil.cmd_args['max_iter'] = int(args[i+1])
+        elif args[i] == '-maxnsf':
+            patutil.cmd_args['max_nsf'] = int(args[i+1])
         elif args[i] == '-nonsf': # Find all data, not just nsf
             patutil.cmd_args['no_nsf_flag'] = True
         elif args[i] == '-single': # Prevents downloading and/or parsing of more than one xml file
@@ -175,9 +183,9 @@ if __name__ == '__main__':
         elif args[i] == '-dump':
             patutil.cmd_args['dump_flag'] = True
 
-    print 'Straight args: %s, ptype %s, max_iter %s, filename %s, nonsf %s, single_doc %s' % (args, patutil.cmd_args['ptype'], str(patutil.cmd_args['max_iter']), str(patutil.cmd_args['filename']), str(patutil.cmd_args['no_nsf_flag']), str(patutil.cmd_args['single_doc_flag']))
+    print 'Straight args: %s, ptype %s, max_iter %s, max_nsf %s, filename %s, nonsf %s, single_doc %s' % (args, patutil.cmd_args['ptype'], str(patutil.cmd_args['max_iter']), str(patutil.cmd_args['max_nsf']), str(patutil.cmd_args['filename']), str(patutil.cmd_args['no_nsf_flag']), str(patutil.cmd_args['single_doc_flag']))
 
-    filename = patutil.cmd_args['filename']
+    filename = patutil.getUrlFilename(patutil.cmd_args['filename'])
     if filename != None and patutil.cmd_args['ptype'] == None:
         if filename[:3] == 'ipa':
             patutil.cmd_args['ptype'] = 'a'

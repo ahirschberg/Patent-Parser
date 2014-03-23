@@ -4,7 +4,7 @@ import sys
 import codecs
 
 print_over_len = None
-cmd_args = {'ptype' : None, 'filename' : None, 'max_iter' : -1, 'no_nsf_flag' : False, 'single_doc_flag' : False, 'dump_flag' : True}
+cmd_args = {'ptype' : None, 'filename' : None, 'max_iter' : -1, 'max_nsf' : -1, 'no_nsf_flag' : False, 'single_doc_flag' : False, 'dump_flag' : False}
 
 # Get working directory
 def getwd():
@@ -97,7 +97,7 @@ class CSVFileWriter:
         if self.filename[-4:] != '.csv':
             self.filename = self.filename + '.csv'
 
-        if cmd_args['max_iter'] >= 0 and self.filename[:4] != 'inc_':
+        if (cmd_args['max_iter'] >= 0 or cmd_args['max_nsf'] >= 0) and self.filename[:4] != 'inc_':
             self.filename = 'inc_' + self.filename
         f = codecs.open(getwd() + self.output_directory + self.filename, mode, 'utf-8-sig')
 
