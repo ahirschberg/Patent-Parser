@@ -315,10 +315,16 @@ def parse_xml(soup, tag):
                         #print name
                         templist.append('[')
                         # Only append if tag contains name (first-name), (last-name), etc.
-                        templist.append(name.find('first-name').string)
-                        if (name.find('middle-name') != None):
-                            templist.append(' ' + name.find('middle-name').string)
-                        templist.append(' ' + name.find('last-name').string)
+                        fname = name.find('first-name')
+                        mname = name.find('middle-name')
+                        lname = name.find('last-name')
+                        if fname != None:
+                            templist.append(fname.string)
+                            if (mname != None):
+                                templist.append(' ' + mname.string)
+                            templist.append(' ')
+                        if lname != None:
+                            templist.append(lname.string)
                         templist.append(']')
                 
                     result = ''.join(templist)
